@@ -112,6 +112,7 @@ body {
   height: calc(100dvh - 40px);                 
   border: 8px solid #1a2a5e;     
   padding: 2rem;
+  position: relative;
   
 }
 
@@ -137,7 +138,8 @@ footer {
   right: 2rem;
   display: flex;
   gap: 1.5rem;
-  justify-content: flex-end;   /* use flex-start to put the links on the left */
+  justify-content: center;
+  align-items: center;
 }
 
 footer a {
