@@ -130,3 +130,23 @@ h2 {
   color: #1a2a5e;
 }
 
+footer {
+  position: absolute;
+  bottom: 2rem;
+  left: 2rem;
+  right: 2rem;
+  display: flex;
+  gap: 1.5rem;
+  justify-content: flex-end;   /* use flex-start to put the links on the left */
+}
+
+footer a {
+  color: #1a2a5e;
+  font-weight: 400;
+  text-decoration: none;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
+
