@@ -98,7 +98,7 @@ h1 {
   font-weight: 700;
   font-style: normal;
   color: #1a2a5e;
-  text-align: right;
+  text-align: left;
 }
 
 h2 {
@@ -106,6 +106,6 @@ h2 {
   font-weight: 400;
   font-style: italic;
   color: #1a2a5e;
-  text-align: right;
+  text-align: left;
 }
 
