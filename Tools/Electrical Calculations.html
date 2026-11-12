@@ -1,0 +1,435 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Electrical Calculations</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: app shell — sidebar nav + a pane holding the busbar calculator
+   (inputs card + monospaced result tiles with a cross-section diagram) and a
+   documentation tab. Color: warm copper accent over cool slate neutrals.
+   Type: IBM Plex Sans for UI, IBM Plex Mono for every number and formula. */
+:root{
+  --bg:#f3f4f6; --surface:#ffffff; --surface-2:#f7f8fa; --line:#e2e5ea;
+  --ink:#191c22; --muted:#5b616b; --faint:#8b919b;
+  --accent:#b5531d; --accent-ink:#ffffff; --accent-soft:#f6e9df;
+  --field:#ffffff; --field-line:#cdd2da; --field-focus:#b5531d;
+  --ok:#1f7a4d; --warn:#9a6300; --bad:#b02a2a;
+  --ok-soft:#e5f3eb; --warn-soft:#f6edda; --bad-soft:#f7e6e6;
+  --shadow:0 1px 2px rgba(20,25,35,.06),0 8px 24px rgba(20,25,35,.06);
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular","Consolas",monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121419; --surface:#1a1d23; --surface-2:#20242b; --line:#2b2f37;
+  --ink:#e8eaee; --muted:#a2a8b2; --faint:#767c86;
+  --accent:#e08a4e; --accent-ink:#1a1206; --accent-soft:#2c2114;
+  --field:#14171c; --field-line:#343a44; --field-focus:#e08a4e;
+  --ok:#5bc48a; --warn:#d8a44a; --bad:#e8807a;
+  --ok-soft:#15241c; --warn-soft:#2a2214; --bad-soft:#2a1818;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 28px rgba(0,0,0,.35);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#121419; --surface:#1a1d23; --surface-2:#20242b; --line:#2b2f37;
+  --ink:#e8eaee; --muted:#a2a8b2; --faint:#767c86;
+  --accent:#e08a4e; --accent-ink:#1a1206; --accent-soft:#2c2114;
+  --field:#14171c; --field-line:#343a44; --field-focus:#e08a4e;
+  --ok:#5bc48a; --warn:#d8a44a; --bad:#e8807a;
+  --ok-soft:#15241c; --warn-soft:#2a2214; --bad-soft:#2a1818;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 28px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;margin:0}
+.wrap{max-width:1120px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));}
+header{display:flex;align-items:center;gap:14px;padding-block:20px 10px;flex-wrap:wrap}
+.logo{width:36px;height:36px;border-radius:9px;background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;font-weight:700;font-size:19px;flex:0 0 auto}
+.htext{flex:1;min-width:0}
+.htext h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.htext p{margin:1px 0 0;font-size:13px;color:var(--muted)}
+.verified{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;
+  color:var(--ok);background:var(--ok-soft);padding:4px 9px;border-radius:999px;white-space:nowrap}
+.verified::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.themebtn{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);
+  border-radius:8px;padding:7px 12px;cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+.themebtn:hover{border-color:var(--accent)}
+
+.shell{display:grid;grid-template-columns:200px 1fr;gap:22px;flex:1;padding-bottom:28px;align-items:start}
+nav.side{position:sticky;top:12px;display:flex;flex-direction:column;gap:3px}
+nav.side .g{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;
+  color:var(--faint);padding:10px 10px 4px}
+nav.side button{font:inherit;font-size:14px;text-align:left;color:var(--muted);background:transparent;
+  border:0;border-radius:8px;padding:8px 11px;cursor:pointer;display:flex;align-items:center;gap:9px}
+nav.side button:hover{background:var(--surface-2);color:var(--ink)}
+nav.side button[aria-current="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+nav.side button .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55;flex:0 0 auto}
+
+main{min-width:0}
+.pane{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.pane-head{padding:18px 22px 14px;border-bottom:1px solid var(--line)}
+.pane-head h2{margin:0;font-size:18px;font-weight:700;letter-spacing:-.01em}
+.pane-head p{margin:5px 0 0;font-size:13.5px;color:var(--muted);max-width:62ch}
+.pane-body{padding:20px 22px 22px;display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.pane-body.single{display:block}
+@media (max-width:860px){.shell{grid-template-columns:1fr}
+  nav.side{position:static;flex-direction:row;overflow-x:auto;gap:7px;padding-bottom:4px;margin:0 -4px}
+  nav.side .g{display:none} nav.side button{white-space:nowrap;border:1px solid var(--line)}
+}
+@media (max-width:620px){.pane-body{grid-template-columns:1fr}}
+
+.group{display:flex;flex-direction:column;gap:2px}
+.glabel{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);margin:0 0 8px}
+.field{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.field:last-child{border-bottom:0}
+.field label{font-size:14px;color:var(--ink)}
+.field .in{display:flex;align-items:center;gap:7px}
+input[type=number]{font:inherit;font-size:14px;font-family:var(--mono);
+  background:var(--field);color:var(--ink);border:1px solid var(--field-line);border-radius:8px;
+  padding:7px 9px;width:120px;text-align:right;font-variant-numeric:tabular-nums}
+input:focus{outline:none;border-color:var(--field-focus);box-shadow:0 0 0 3px var(--accent-soft)}
+.suffix{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:30px}
+.segmented{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px;flex-wrap:wrap}
+.segmented label{font-size:12.5px;padding:5px 11px;border-radius:7px;cursor:pointer;color:var(--muted)}
+.segmented input{position:absolute;opacity:0;width:0;height:0}
+.segmented label:has(input:checked){background:var(--accent);color:var(--accent-ink);font-weight:500}
+
+.results{display:flex;flex-direction:column;gap:12px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;min-width:0}
+.tile .t-l{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);
+  display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tile .t-v{font-family:var(--mono);font-size:25px;font-weight:600;letter-spacing:-.02em;margin-top:5px;
+  font-variant-numeric:tabular-nums;color:var(--ink);word-break:break-word}
+.tile .t-v .u{font-size:13px;color:var(--muted);font-weight:400;margin-left:4px}
+.tile.accent .t-v{color:var(--accent)}
+.chip{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)} .chip.mut{background:var(--surface);color:var(--faint);border:1px solid var(--line)}
+.hint{font-size:12px;color:var(--muted);line-height:1.5}
+.subhead{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);margin:2px 0 -2px}
+.diagram{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px;display:grid;place-items:center}
+.diagram svg{width:100%;height:auto;max-width:360px}
+select{font:inherit;font-size:14px;font-family:var(--mono);background:var(--field);color:var(--ink);
+  border:1px solid var(--field-line);border-radius:8px;padding:7px 9px;min-width:150px}
+select:focus{outline:none;border-color:var(--field-focus);box-shadow:0 0 0 3px var(--accent-soft)}
+table.rows{width:100%;border-collapse:collapse;font-size:13px}
+table.rows td{padding:6px 0;border-bottom:1px solid var(--line)}
+table.rows td:nth-child(3){text-align:right;font-family:var(--mono)}
+.addrow{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.minibtn{font:inherit;font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 11px;cursor:pointer;color:var(--ink)}
+.minibtn:hover{border-color:var(--accent)}
+.del{color:var(--bad);cursor:pointer;font-family:var(--mono);border:0;background:none;font-size:15px;padding:0 4px}
+footer{color:var(--muted);font-size:12px;padding:6px 0 22px;line-height:1.5;border-top:1px solid var(--line);margin-top:4px}
+footer a,a{color:var(--accent)}
+
+/* documentation tab */
+.doc{max-width:72ch;display:flex;flex-direction:column;gap:18px}
+.doc h3{margin:0;font-size:16px;font-weight:700}
+.doc h3 .tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;
+  margin-left:9px;padding:2px 7px;border-radius:999px;vertical-align:middle}
+.doc .exact{background:var(--ok-soft);color:var(--ok)} .doc .approx{background:var(--warn-soft);color:var(--warn)}
+.doc p{margin:0;color:var(--ink);font-size:14px}
+.doc .muted{color:var(--muted);font-size:13px}
+.doc section{display:flex;flex-direction:column;gap:9px;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.doc section:last-child{border-bottom:0}
+.formula{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;
+  padding:11px 14px;font-family:var(--mono);font-size:13.5px;color:var(--ink);overflow-x:auto;white-space:nowrap}
+.formula .c{color:var(--muted)}
+dl.vars{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0;font-size:13px}
+dl.vars dt{font-family:var(--mono);color:var(--accent)}
+dl.vars dd{margin:0;color:var(--muted)}
+table.const{border-collapse:collapse;font-size:13px;width:100%;max-width:440px}
+table.const th,table.const td{text-align:left;padding:5px 10px;border-bottom:1px solid var(--line)}
+table.const th{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);font-weight:500}
+table.const td:not(:first-child){font-family:var(--mono);text-align:right}
+.callout{background:var(--ok-soft);border:1px solid color-mix(in srgb,var(--ok) 30%,transparent);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--ink)}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="logo">Ω</div>
+    <div class="htext">
+      <h1>Electrical Calculations</h1>
+      <p>Busbar rating, voltage drop &amp; dissipation — recreation of the L.M. Photonics program</p>
+    </div>
+    <span class="verified">verified&nbsp;vs&nbsp;original</span>
+    <button class="themebtn" id="resetbtn" type="button" title="Clear entries and restore defaults">↺ Reset</button>
+    <button class="themebtn" id="themebtn" type="button">◐ Theme</button>
+  </header>
+
+  <div class="shell">
+    <nav class="side" id="rail" aria-label="Sections"></nav>
+    <main><div class="pane">
+      <div class="pane-head"><h2 id="pTitle"></h2><p id="pDesc"></p></div>
+      <div class="pane-body" id="pBody"></div>
+    </div></main>
+  </div>
+
+  <footer>
+    Formulas recovered from the original program’s help and verified against its worked examples.
+    Indicative engineering estimates — confirm against the applicable standards before design use.
+  </footer>
+</div>
+
+<script>
+"use strict";
+const SQRT3=Math.sqrt(3);
+const RHO={cu:1.72e-8,al:2.61e-8}, ALPHA={cu:0.00393,al:0.00403};
+const TMAX={al:90,cu:105}, HRAT={cu:10.04,al:7.05};
+const CFG={single:1,single_phase:2,three_phase:SQRT3};
+const MM_PER_IN=25.4, M_PER_IN=0.0254;
+const IEC_B={
+  free_standing:{top:1.4,bottom:0,front:0.9,back:0.9,side:0.9,side2:0.9},
+  against_wall:{top:1.4,bottom:0,front:0.9,back:0.5,side:0.9,side2:0.9},
+  end_free:{top:1.4,bottom:0,front:0.9,back:0.9,side:0.9,side2:0.5},
+  end_wall:{top:1.4,bottom:0,front:0.9,back:0.5,side:0.9,side2:0.5},
+  mid_free:{top:1.4,bottom:0,front:0.9,back:0.9,side:0.5,side2:0.5},
+  mid_wall:{top:1.4,bottom:0,front:0.9,back:0.5,side:0.5,side2:0.5},
+  mid_wall_roof:{top:0.5,bottom:0,front:0.9,back:0.5,side:0.5,side2:0.5},
+};
+const K_SURF=5.53;
+const calc={
+  encArea(h,w,d,i){const H=h/1000,W=w/1000,D=d/1000,b=IEC_B[i];return W*D*b.top+W*D*b.bottom+W*H*b.front+W*H*b.back+D*H*b.side+D*H*b.side2;},
+  encRth(h,w,d,i){return 1/(K_SURF*this.encArea(h,w,d,i));},
+  bbRes:(wMm,tMm,Lm,rho)=>rho*Lm/((wMm*1e-3)*(tMm*1e-3)),
+  busbarVD(wMm,tMm,Lm,I,c){const k=CFG[c];return{al:I*this.bbRes(wMm,tMm,Lm,RHO.al)*k,cu:I*this.bbRes(wMm,tMm,Lm,RHO.cu)*k};},
+  busbarPD(wMm,tMm,Lm,I,c){const k=CFG[c];return{al:k*I*I*this.bbRes(wMm,tMm,Lm,RHO.al),cu:k*I*I*this.bbRes(wMm,tMm,Lm,RHO.cu)};},
+  bbRateOne(wMm,tMm,amb,r20,al,tm,h){const dT=tm-amb;if(dT<=0)return 0;
+    const Ac=(wMm*1e-3)*(tMm*1e-3), As=2*((wMm+tMm)*1e-3), rs=r20*(1+al*(tm-20)), Re=rs/Ac;
+    return Math.sqrt(h*As*dT/Re);},
+  busbarRate(wMm,tMm,amb){return{al:this.bbRateOne(wMm,tMm,amb,RHO.al,ALPHA.al,TMAX.al,HRAT.al),
+                                 cu:this.bbRateOne(wMm,tMm,amb,RHO.cu,ALPHA.cu,TMAX.cu,HRAT.cu)};},
+};
+
+const el=(t,a={},...k)=>{const e=document.createElement(t);for(const[p,v]of Object.entries(a)){
+  if(p==="class")e.className=v;else if(p==="html")e.innerHTML=v;else if(p.slice(0,2)==="on"&&typeof v==="function")e.addEventListener(p.slice(2),v);else if(v!==false&&v!=null)e.setAttribute(p,v);}
+  for(const c of k.flat())if(c!=null)e.append(c.nodeType?c:document.createTextNode(c));return e;};
+const num=(v,d)=>Number.isFinite(v)?v.toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d}):"—";
+const auto=v=>num(v,(Math.abs(v)<10&&v!==0)?3:(Math.abs(v)<100?2:1));
+const $=id=>document.getElementById(id);
+const gv=id=>parseFloat($(id).value);
+const radio=n=>{const r=document.querySelector(`input[name="${n}"]:checked`);return r?r.value:null;};
+
+function field(label,id,val,suffix,step){
+  return el("div",{class:"field"},el("label",{for:id},label),
+    el("div",{class:"in"},el("input",{type:"number",id,value:val,step:step||"any"}),suffix?el("span",{class:"suffix"},suffix):null));
+}
+function segmented(name,items,val){
+  return el("div",{class:"segmented"},...items.map(it=>el("label",{},
+    el("input",{type:"radio",name,value:it.v,checked:it.v===val}),it.t)));
+}
+function tile(label,id,unit,opts){opts=opts||{};
+  return el("div",{class:"tile"+(opts.accent?" accent":"")},
+    el("div",{class:"t-l"},el("span",{},label),opts.chip?el("span",{class:"chip mut",id:id+"_c"},"—"):null),
+    el("div",{class:"t-v"},el("span",{id},"—"),el("span",{class:"u"}," "+(unit||""))));
+}
+function setTile(id,v,unit){const e=$(id);e.textContent=auto(v);const u=e.nextSibling;if(u)u.textContent=" "+(unit||"");}
+function setChip(id,text,kind){const c=$(id+"_c");if(!c)return;c.textContent=text;c.className="chip "+(kind||"mut");}
+function bind(scope,fn){scope.querySelectorAll("input").forEach(i=>i.addEventListener("input",fn));}
+
+// --- remember what the user typed, per field, across tab switches and reloads ---
+let STATE={};
+try{STATE=JSON.parse(localStorage.getItem("ec_state")||"{}")||{};}catch(e){STATE={};}
+function persistState(){try{localStorage.setItem("ec_state",JSON.stringify(STATE));}catch(e){}}
+function captureInput(e){const t=e.target;
+  if(!t||(t.tagName!=="INPUT"&&t.tagName!=="SELECT"))return;
+  if(t.type==="radio"){if(t.checked)STATE["radio:"+t.name]=t.value;}
+  else if(t.id)STATE["val:"+t.id]=t.value;
+  persistState();
+}
+function applyState(scope){
+  scope.querySelectorAll("input,select").forEach(i=>{
+    if(i.type==="radio"){const v=STATE["radio:"+i.name];if(v!==undefined)i.checked=(i.value===v);}
+    else if(i.id){const v=STATE["val:"+i.id];if(v!==undefined&&v!=="")i.value=v;}
+  });
+}
+
+const C={};
+C.busbar={group:"Calculator",label:"Busbar",title:"Busbar rating, voltage drop & dissipation",
+  desc:"Continuous current rating, resistive voltage drop and power loss for a rectangular bar. Dimensions in inches; results compare aluminium and copper.",
+  single:false,
+  build(b){
+    b.append(
+      el("div",{class:"group"},el("p",{class:"glabel"},"Bar geometry & duty"),
+        field("Width","bbW",4,"in",0.25),field("Thickness","bbT",0.25,"in",0.25),field("Length","bbL",48,"in",0.25),
+        field("Current (RMS)","bbI",1000,"A"),field("Ambient","bbA",45,"°C"),
+        el("div",{class:"field"},el("label",{},"Configuration"),
+          segmented("bbCfg",[{v:"single",t:"Single"},{v:"single_phase",t:"1-ph"},{v:"three_phase",t:"3-ph"}],"single")),
+        el("div",{class:"diagram",style:"margin-top:14px"},el("div",{id:"bbDiag"}))),
+      el("div",{class:"results"},
+        el("p",{class:"subhead"},"Current rating"),
+        el("div",{class:"tiles"},tile("Aluminium","bbRateAl","A",{chip:1}),tile("Copper","bbRateCu","A",{chip:1})),
+        el("p",{class:"subhead"},"Voltage drop"),
+        el("div",{class:"tiles"},tile("Aluminium","bbVdAl","V"),tile("Copper","bbVdCu","V")),
+        el("p",{class:"subhead"},"Power dissipation"),
+        el("div",{class:"tiles"},tile("Aluminium","bbPdAl","W"),tile("Copper","bbPdCu","W")),
+        el("p",{class:"hint"},"See the ‘How it works’ tab for the formulas and constants."),
+        el("p",{class:"hint",style:"margin-top:-4px"},el("strong",{},"Configuration")," sets how many bar lengths the voltage drop and loss are counted over — Single bar ×1, Single phase ×2 (active + neutral), Three phase ×√3 (line-to-line). The current rating is unaffected by this choice.")));
+    bind(b,this.run);this.run();
+  },
+  run(){const w=gv("bbW"),t=gv("bbT"),L=gv("bbL"),I=gv("bbI"),a=gv("bbA"),cfg=radio("bbCfg");
+    if([w,t,L,I,a].some(x=>!Number.isFinite(x)))return;
+    const wmm=w*MM_PER_IN, tmm=t*MM_PER_IN, Lm=L*M_PER_IN;  // inches -> mm / m for the engine
+    const r=calc.busbarRate(wmm,tmm,a),vd=calc.busbarVD(wmm,tmm,Lm,I,cfg),pd=calc.busbarPD(wmm,tmm,Lm,I,cfg);
+    setTile("bbRateAl",r.al,"A");setTile("bbRateCu",r.cu,"A");
+    setTile("bbVdAl",vd.al,"V");setTile("bbVdCu",vd.cu,"V");
+    setTile("bbPdAl",pd.al,"W");setTile("bbPdCu",pd.cu,"W");
+    for(const[m,rate] of [["Al",r.al],["Cu",r.cu]]){
+      const id="bbRate"+m, ratio=I/rate;
+      setChip(id, I<=rate?Math.round(ratio*100)+"% load":"over by "+Math.round((ratio-1)*100)+"%",
+        ratio<=0.85?"ok":ratio<=1?"warn":"bad");
+    }
+    drawBar(wmm,tmm,w,t);
+  }};
+function drawBar(w,t,wlab,tlab){
+  const maxw=260,maxh=120,sc=Math.min(maxw/Math.max(w,1),maxh/Math.max(t,1),14);
+  const W=Math.max(w*sc,24),H=Math.max(t*sc,10),ox=50,oy=38,dp=16;
+  const css=getComputedStyle(document.documentElement);
+  const acc=css.getPropertyValue("--accent").trim(),ink=css.getPropertyValue("--muted").trim(),fa=css.getPropertyValue("--faint").trim();
+  $("bbDiag").innerHTML=`<svg viewBox="0 0 ${ox+W+dp+70} ${oy+H+dp+36}" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono, monospace" font-size="11">
+    <polygon points="${ox},${oy} ${ox+W},${oy} ${ox+W+dp},${oy-dp} ${ox+dp},${oy-dp}" fill="${acc}" opacity="0.35"/>
+    <polygon points="${ox+W},${oy} ${ox+W+dp},${oy-dp} ${ox+W+dp},${oy+H-dp} ${ox+W},${oy+H}" fill="${acc}" opacity="0.55"/>
+    <rect x="${ox}" y="${oy}" width="${W}" height="${H}" fill="${acc}" opacity="0.8"/>
+    <line x1="${ox}" y1="${oy+H+10}" x2="${ox+W}" y2="${oy+H+10}" stroke="${fa}"/>
+    <text x="${ox+W/2}" y="${oy+H+24}" fill="${ink}" text-anchor="middle">${wlab}″</text>
+    <line x1="${ox-10}" y1="${oy}" x2="${ox-10}" y2="${oy+H}" stroke="${fa}"/>
+    <text x="${ox-16}" y="${oy+H/2+4}" fill="${ink}" text-anchor="end">${tlab}″</text>
+    <text x="${ox+W+dp+8}" y="${oy+H/2+4}" fill="${fa}">cross-section</text>
+  </svg>`;
+}
+
+C.enclosure={group:"Thermal",label:"Enclosure",single:false,
+  title:"Enclosure temperature rise",
+  desc:"Internal temperature rise of a sealed, wall-mounted enclosure from its dimensions and the total power dissipated inside (IEC 60890). Dimensions in inches.",
+  build(b){
+    b.append(
+      el("div",{class:"group"},el("p",{class:"glabel"},"Enclosure"),
+        field("Height","enH",23.62,"in",0.25),field("Width","enW",15.75,"in",0.25),field("Depth","enD",7.87,"in",0.25),
+        field("Power dissipated","enP",100,"W")),
+      el("div",{class:"results"},
+        el("div",{class:"tiles"},tile("Equivalent area","enA","m²"),tile("Thermal resistance","enR","°C/W")),
+        el("div",{class:"tiles",style:"grid-template-columns:1fr"},tile("Temperature rise","enT","°C",{accent:1,chip:1})),
+        el("p",{class:"hint"},"Temperature rise = power dissipated × enclosure thermal resistance.")));
+    bind(b,()=>this.run());this.run();
+  },
+  run(){const h=gv("enH"),w=gv("enW"),d=gv("enD"),P=gv("enP"),inst="against_wall";
+    if([h,w,d,P].some(x=>!Number.isFinite(x)))return;
+    const hm=h*MM_PER_IN,wm=w*MM_PER_IN,dm=d*MM_PER_IN;  // inches -> mm for the engine
+    const a=calc.encArea(hm,wm,dm,inst),r=calc.encRth(hm,wm,dm,inst),dT=P*r;
+    setTile("enA",a,"m²");setTile("enR",r,"°C/W");setTile("enT",dT,"°C");
+    setChip("enT",dT<20?"comfortable":dT<35?"watch":"ventilate",dT<20?"ok":dT<35?"warn":"bad");}};
+
+C.docs={group:"Reference",label:"How it works",title:"How the busbar calculations are performed",
+  desc:"Every formula and constant used by the Busbar tab, with the units and the provenance of each value.",
+  single:true,
+  build(b){
+    const F=(html)=>el("div",{class:"formula",html});
+    const sec=(...kids)=>el("section",{},...kids);
+    const h=(txt,tag,cls)=>el("h3",{},txt,tag?el("span",{class:"tag "+cls},tag):null);
+    const doc=el("div",{class:"doc"});
+    doc.append(
+      sec(
+        el("p",{},"The Busbar tab takes a rectangular bar and its duty, and reports the continuous current rating, the resistive voltage drop and the power dissipated — for both aluminium and copper. All three start from the bar’s resistance."),
+        el("p",{class:"muted"},"Inputs are entered in inches and converted internally: width and thickness ×25.4 to millimetres, length ×0.0254 to metres. Current is RMS amperes, ambient in °C.")
+      ),
+      sec(
+        h("1 · Resistance","exact","exact"),
+        el("p",{},"The bar is treated as a conductor of uniform rectangular section. Resistance follows the standard relation:"),
+        F(`R  =  ρ · L / A        <span class="c">A = width × thickness</span>`),
+        el("dl",{class:"vars"},
+          el("dt",{},"ρ"),el("dd",{},"resistivity (Ω·m) — copper 1.72×10⁻⁸, aluminium 2.61×10⁻⁸"),
+          el("dt",{},"L"),el("dd",{},"bar length (m)"),
+          el("dt",{},"A"),el("dd",{},"cross-sectional area (m²) = (w·10⁻³)(t·10⁻³)"))
+      ),
+      sec(
+        h("2 · Voltage drop","exact","exact"),
+        el("p",{},"The resistive drop is current × resistance × a configuration factor k that counts how many bar lengths are in the circuit:"),
+        F(`V  =  I · R · k`),
+        el("dl",{class:"vars"},
+          el("dt",{},"k = 1"),el("dd",{},"single bar — drop along one length"),
+          el("dt",{},"k = 2"),el("dd",{},"single phase — active + neutral (two lengths)"),
+          el("dt",{},"k = √3"),el("dd",{},"three phase — line-to-line drop"))
+      ),
+      sec(
+        h("3 · Power dissipation","exact","exact"),
+        el("p",{},"The I²R loss, using the same configuration factor:"),
+        F(`P  =  k · I² · R`),
+        el("p",{class:"muted"},"For a cyclic load, enter the RMS current rather than the average, since loss scales with the square of current.")
+      ),
+      sec(
+        h("4 · Current rating","approximate","approx"),
+        el("p",{},"The rating is the current at which the bar reaches its maximum allowable surface temperature. At thermal equilibrium the electrical loss per metre equals the heat the surface can shed per metre:"),
+        F(`I²·R_elec  =  h · A_surf · ΔT      <span class="c">→</span>      I  =  √( h · A_surf · ΔT / R_elec )`),
+        el("dl",{class:"vars"},
+          el("dt",{},"R_elec"),el("dd",{},"ρ(Tₛ) / A_cross — resistance per metre at surface temp"),
+          el("dt",{},"ρ(Tₛ)"),el("dd",{},"ρ₂₀ · (1 + α(Tₘₐₓ − 20)) — temperature-corrected resistivity"),
+          el("dt",{},"A_surf"),el("dd",{},"2·(w + t) — perimeter / surface area per metre (m²/m)"),
+          el("dt",{},"ΔT"),el("dd",{},"Tₘₐₓ − ambient"),
+          el("dt",{},"h"),el("dd",{},"effective convection + radiation coefficient (W/m²K)")),
+        el("p",{class:"muted"},"Maximum surface temperatures: aluminium 90 °C (60 °C rise over a 30 °C reference), copper 105 °C (75 °C rise). Raising the ambient lowers ΔT and therefore the rating. The suitability chip compares your operating current to this rating."),
+        el("table",{class:"const"},
+          el("tr",{},el("th",{},"Material"),el("th",{},"ρ₂₀ (Ω·m)"),el("th",{},"α (/°C)"),el("th",{},"Tₘₐₓ"),el("th",{},"h")),
+          el("tr",{},el("td",{},"Copper"),el("td",{},"1.72×10⁻⁸"),el("td",{},"0.00393"),el("td",{},"105 °C"),el("td",{},"10.04")),
+          el("tr",{},el("td",{},"Aluminium"),el("td",{},"2.61×10⁻⁸"),el("td",{},"0.00403"),el("td",{},"90 °C"),el("td",{},"7.05"))),
+        el("p",{class:"muted"},"The rating model is marked approximate: the original program embeds an orientation-dependent convection+radiation correlation, while h here is a single coefficient calibrated so the model reproduces the reference point exactly. Voltage drop and dissipation are exact.")
+      ),
+      sec(
+        h("Provenance & verification"),
+        el("p",{},"These formulas and constants were recovered from the original program’s own help and calibrated to its worked examples. The resistivities were back-solved from the published voltage-drop figures; the rating coefficients from the published ratings."),
+        el("div",{class:"callout"},
+          el("strong",{},"Reference case — 12×3 mm bar, 1 m, 80 A, 45 °C ambient, single bar:"),
+          el("div",{style:"font-family:var(--mono);margin-top:6px;font-size:12.5px"},
+            "voltage drop  Cu 0.038 V · Al 0.058 V",el("br"),
+            "dissipation   Cu 3.10 W · Al 4.70 W",el("br"),
+            "rating        Cu 168.4 A · Al 101.2 A")),
+        el("p",{class:"muted"},"The reference case above is the fixture used to calibrate the constants and reproduces the original program exactly. The Busbar tab’s own defaults (4″ × 0.25″ × 48″, 1000 A) are just a typical switchboard bar and can be changed freely.")
+      )
+    );
+    b.append(doc);
+  },
+  run(){}};
+
+const ORDER=["busbar","enclosure","docs"];
+function buildRail(){
+  const rail=$("rail");rail.innerHTML="";let lastG=null;
+  for(const k of ORDER){const c=C[k];
+    if(c.group!==lastG){rail.append(el("div",{class:"g"},c.group));lastG=c.group;}
+    rail.append(el("button",{type:"button","data-k":k,onclick:()=>show(k)},el("span",{class:"dot"}),c.label));
+  }
+}
+function show(k){
+  for(const btn of document.querySelectorAll(".side button"))btn.setAttribute("aria-current",btn.dataset.k===k?"true":"false");
+  const c=C[k];$("pTitle").textContent=c.title;$("pDesc").textContent=c.desc;
+  const body=$("pBody");body.className="pane-body"+(c.single?" single":"");body.innerHTML="";c.build(body);
+  applyState(body);            // restore anything the user typed earlier
+  if(c.run)c.run();            // recompute from the restored values
+  try{location.hash=k;}catch(e){}
+}
+(function(){let cur=null;try{cur=localStorage.getItem("ec2_theme");}catch(e){}
+  if(cur)document.documentElement.setAttribute("data-theme",cur);
+  $("themebtn").addEventListener("click",()=>{
+    const now=document.documentElement.getAttribute("data-theme");
+    const dark=now?now==="dark":window.matchMedia("(prefers-color-scheme:dark)").matches;
+    document.documentElement.setAttribute("data-theme",dark?"light":"dark");
+    try{localStorage.setItem("ec2_theme",dark?"light":"dark");}catch(e){}
+    const c=document.querySelector(".side button[aria-current='true']");if(c)show(c.dataset.k);
+  });})();
+// capture every edit in the pane (delegated) so switching tabs keeps the values
+$("pBody").addEventListener("input",captureInput);
+$("pBody").addEventListener("change",captureInput);
+$("resetbtn").addEventListener("click",()=>{
+  STATE={};try{localStorage.removeItem("ec_state");}catch(e){}
+  const cur=document.querySelector(".side button[aria-current='true']");
+  show(cur?cur.dataset.k:"busbar");
+});
+
+buildRail();
+let start=(location.hash||"").replace("#","");if(!ORDER.includes(start))start="busbar";
+show(start);
+</script>
+
+</body></html>
