@@ -92,9 +92,11 @@
 }
 
 html, body {
-  height: 100%;
-  margin: 0;
   overflow: hidden;   /* no scrolling */
+}
+
+html {
+  background: #EDE8D0;   /* color of the gap outside the border */
 }
 
 /* END PAGE SETUP ---------------------------------------------*/
@@ -106,9 +108,10 @@ body {
   color: #1a2a5e;
   text-align: left;
 
-  height: 100dvh;                 /* exactly the window height, including on phones */
-  border: 12px solid #1a2a5e;     /* blue border around the whole window */
-  padding: 20rem;
+  margin: 20px;
+  height: calc(100dvh - 40px);                 
+  border: 8px solid #1a2a5e;     
+  padding: 2rem;
   
 }
 
