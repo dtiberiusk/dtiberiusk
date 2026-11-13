@@ -166,9 +166,12 @@ footer a {
   color: #1a2a5e;
   font-weight: 400;
   text-decoration: none;
+  display: inline-block;
+  transition: transform 0.2s ease;
 }
 
 footer a:hover {
   text-decoration: underline;
+  transform: scale(1.1);
 }
 
