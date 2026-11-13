@@ -120,8 +120,12 @@ body {
 header {
   display: flex;
   justify-content: flex-start; 
-  align-items: center;         
+  align-items: flex-start;         
   gap: 2rem;
+}
+
+.titles h1 {
+  margin-top: 0;
 }
 
 .top-image {
