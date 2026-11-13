@@ -1,0 +1,426 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Starward</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: phone-first tableau game — score header, rival tableau strip, phase track, action panel, your tableau grid, hand rail */
+:root{
+  --bg:#e6eaf1; --surface:#f7f9fc; --sunk:#d9dfe9; --ink:#1a2033; --muted:#5a6378; --line:#c6cedc;
+  --accent:#a97a1f; --accent-ink:#fffaf0; --good:#2f7d4f; --bad:#a63a3a;
+  --ore:#9a643a; --bio:#3f8a46; --tech:#2f6fb0; --relic:#94700a; --mil:#a8423a; --dev:#6a4fa0; --none:#7a8297;
+  --display:"Chakra Petch", "Trebuchet MS", sans-serif; --body:"Barlow", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1220; --surface:#181c2e; --sunk:#232840; --ink:#e4e8f4; --muted:#98a0b8; --line:#2f3552;
+  --accent:#e2b04a; --accent-ink:#1b1405; --good:#6fcf8f; --bad:#ef7f7f;
+  --ore:#d08a55; --bio:#6cc472; --tech:#62a6ec; --relic:#e8c24a; --mil:#e2706a; --dev:#a98ae6; --none:#8e97b0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1220; --surface:#181c2e; --sunk:#232840; --ink:#e4e8f4; --muted:#98a0b8; --line:#2f3552;
+  --accent:#e2b04a; --accent-ink:#1b1405; --good:#6fcf8f; --bad:#ef7f7f;
+  --ore:#d08a55; --bio:#6cc472; --tech:#62a6ec; --relic:#e8c24a; --mil:#e2706a; --dev:#a98ae6; --none:#8e97b0; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.35;-webkit-tap-highlight-color:transparent;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+#app{max-width:560px;margin:0 auto;padding-block:12px 28px;display:flex;flex-direction:column;gap:12px}
+h1{font-family:var(--display);font-weight:700;font-size:2.6rem;margin:0;letter-spacing:.04em;line-height:1}
+h2{font-family:var(--display);font-weight:700;font-size:1.15rem;margin:0;letter-spacing:.02em;text-wrap:balance}
+.label{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:700}
+.desc{color:var(--muted);margin:0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.btn{border:0;border-radius:8px;padding:11px 16px;background:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn:disabled{background:var(--sunk);color:var(--muted);cursor:not-allowed}
+.btn.ghost{background:var(--sunk);color:var(--ink)}
+.btn.small{padding:7px 11px;font-size:.85rem}
+.ore{--c:var(--ore)} .bio{--c:var(--bio)} .tech{--c:var(--tech)} .relic{--c:var(--relic)} .mil{--c:var(--mil)} .dev{--c:var(--dev)} .none{--c:var(--none)}
+
+/* score header */
+.score{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+.score .side b{display:block;font-family:var(--display);font-size:1.6rem;line-height:1}
+.score .side.r{text-align:right}
+.pool{text-align:center}
+.pool b{font-family:var(--display);font-size:1.1rem}
+/* phase track */
+.track{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.ph{border-radius:8px;background:var(--surface);border:1px solid var(--line);padding:5px 2px;text-align:center;font-family:var(--display);font-weight:600;font-size:.72rem;position:relative}
+.ph.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
+.ph.now{box-shadow:0 0 0 2px var(--accent)}
+.ph .who{display:block;font-family:var(--body);font-size:.6rem;color:var(--muted);font-weight:700;min-height:.8rem}
+/* tableaus */
+.tab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+/* tiles: world = round + planet, military = square red frame + shield, development = tinted chip + module */
+.tile{position:relative;text-align:left;border:1px solid var(--line);background:var(--surface);padding:5px 5px 4px;min-width:0;min-height:56px;display:flex;flex-direction:column;gap:2px}
+.tile .th{display:flex;align-items:center;gap:3px;font-size:.56rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--kc)}
+.tile .th svg{width:12px;height:12px;flex:none}
+.tile .tn{font-family:var(--display);font-weight:600;font-size:.7rem;line-height:1.1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tile .tm{font-size:.62rem;color:var(--muted);font-weight:700;margin-top:auto;display:flex;align-items:center;gap:4px}
+.tile .slot{position:absolute;top:5px;right:6px;width:13px;height:13px;transform:rotate(45deg);border-radius:2px;border:1.5px dashed color-mix(in srgb,var(--g) 70%,transparent)}
+.tile .slot.full{background:var(--g);border:2px solid var(--surface);box-shadow:0 0 0 1.5px var(--g),0 0 8px var(--g);width:15px;height:15px;top:4px;right:5px}
+.tile.can-good .th{padding-right:16px}
+.tile.has-good{background:color-mix(in srgb,var(--g) 18%,var(--surface));border-color:var(--g)}
+.tile .gr{color:var(--ink);font-weight:800;background:color-mix(in srgb,var(--g) 30%,transparent);padding:0 4px;border-radius:3px}
+.goodkey{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);font-weight:600;align-items:center}
+.goodkey i{display:inline-block;width:10px;height:10px;transform:rotate(45deg);border-radius:1px;margin-right:6px;vertical-align:0;--g:var(--tech)}
+.goodkey i.full{background:var(--g)} .goodkey i.empty{border:1.5px dashed var(--g)}
+.tile.k-world{--kc:var(--g);border-radius:14px;border-left:4px solid var(--g)}
+.tile.k-mil{--kc:var(--mil);border-radius:2px;border:2px solid var(--mil)}
+.tile.k-dev{--kc:var(--dev);border-radius:4px;background:color-mix(in srgb,var(--dev) 11%,var(--surface));border-color:color-mix(in srgb,var(--dev) 40%,var(--line))}
+.tile.sel{box-shadow:0 0 0 2px var(--accent)}
+.rival{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px}
+.rival .tab{grid-template-columns:repeat(4,minmax(0,1fr))}
+.stats{display:flex;gap:10px;font-size:.78rem;color:var(--muted);font-weight:600;flex-wrap:wrap}
+.stats b{color:var(--ink)}
+/* action panel */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.acts{display:grid;grid-template-columns:1fr;gap:6px}
+.act{display:grid;grid-template-columns:86px 1fr;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:9px 10px}
+.act b{font-family:var(--display);font-size:1rem}
+.act span{font-size:.82rem;color:var(--muted)}
+.act.hint{border-color:var(--accent)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btns .btn{flex:1}
+.goods{display:flex;gap:6px;flex-wrap:wrap}
+.goodbtn{display:flex;gap:6px;align-items:center;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;font-weight:600}
+.goodbtn i{width:12px;height:12px;background:var(--c);transform:rotate(45deg);border-radius:2px}
+/* cards */
+/* cards: a type band on top (icon + label + cost token), name, how to place it, phase-tagged powers, goods + VP footer */
+.card{position:relative;text-align:left;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.card .band{display:flex;align-items:center;gap:5px;padding:5px 6px 5px 7px;background:var(--kc);color:var(--surface);font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;line-height:1}
+.card .band svg{width:14px;height:14px;flex:none}
+.card .band .kl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .cost{flex:none;min-width:22px;height:22px;padding:0 4px;display:grid;place-items:center;background:var(--surface);color:var(--ink);font-family:var(--display);font-size:.95rem;letter-spacing:0}
+.card .body{padding:6px 7px 7px;display:flex;flex-direction:column;gap:4px;flex:1;min-height:0}
+.card .cn{font-family:var(--display);font-weight:700;line-height:1.05;font-size:.92rem;text-wrap:balance}
+.card .how{font-size:.68rem;color:var(--muted);font-weight:600;line-height:1.2}
+.card .how b{color:var(--ink)}
+.card .pw{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;flex:1;min-height:0;overflow:hidden}
+.card .pw li{font-size:.7rem;line-height:1.2}
+.card .tag{display:inline-block;font-size:.54rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;background:var(--sunk);color:var(--ink);padding:1px 4px;border-radius:3px;margin-right:4px;vertical-align:1px}
+.card .tag.end{background:var(--accent);color:var(--accent-ink)}
+.card .tag.mil{background:var(--mil);color:var(--surface)}
+.card .foot{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-top:auto;padding-top:4px;border-top:1px solid var(--line)}
+.card .gl{display:flex;align-items:center;gap:4px;font-size:.66rem;font-weight:700;color:var(--ink);min-width:0}
+.card .gl i{width:9px;height:9px;background:var(--g);transform:rotate(45deg);border-radius:1px;flex:none}
+.card .gl.wf i{background:none;box-shadow:inset 0 0 0 2px var(--g)}
+.card .gl.no{color:var(--muted);font-weight:600}
+.card .vp{font-family:var(--display);font-weight:700;font-size:.9rem;white-space:nowrap}
+.card.k-world{--kc:var(--g);border-radius:16px}
+.card.k-world .cost{border-radius:50%}
+.card.k-mil{--kc:var(--mil);border:2px solid var(--mil);border-radius:3px}
+.card.k-mil .band{background:repeating-linear-gradient(135deg,var(--mil) 0 7px,color-mix(in srgb,var(--mil) 78%,var(--ink)) 7px 14px)}
+.card.k-mil .cost{clip-path:polygon(50% 0,100% 18%,100% 60%,50% 100%,0 60%,0 18%);min-width:24px;height:25px;padding:0 0 2px}
+.card.k-dev{--kc:var(--dev);border-radius:6px;background:color-mix(in srgb,var(--dev) 7%,var(--surface));border-color:color-mix(in srgb,var(--dev) 40%,var(--line))}
+.card.k-dev .cost{border-radius:3px}
+.card.grand .band{background:linear-gradient(90deg,var(--dev),color-mix(in srgb,var(--dev) 55%,var(--accent)))}
+.hand{display:flex;gap:8px;overflow-x:auto;padding:12px 4px 6px;scroll-snap-type:x proximity;align-items:flex-start}
+.hand>button{flex:0 0 136px;padding:0;border:0;background:none;scroll-snap-align:start;text-align:left}
+.hand .card{height:206px}
+.pickgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:8px;padding-top:12px}
+.pickgrid>button{padding:0;border:0;background:none;text-align:left;min-width:0;display:flex}
+.pickgrid .card{min-height:190px;flex:1}
+.legend{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.legend .card{min-height:190px}
+.card.sel{box-shadow:0 0 0 3px var(--accent);transform:translateY(-4px)}
+.card.pay{box-shadow:0 0 0 3px var(--bad)}
+.card.pay::after{content:"Discard";position:absolute;bottom:5px;left:6px;background:var(--bad);color:var(--surface);font-size:.6rem;font-weight:700;padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.06em}
+.paygrid{padding-top:12px}
+.paygrid .card{min-height:170px}
+.card.dim{opacity:.4}
+.card.ok{box-shadow:0 0 0 2px var(--good)}
+.log{font-size:.8rem;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.log p{margin:0}
+.log p:first-child{color:var(--ink);font-weight:600}
+/* sheet */
+.sheet-bg{position:fixed;inset:0;z-index:20;background:rgb(0 0 0 / .45);display:flex;align-items:flex-end}
+.sheet{width:100%;max-width:560px;margin:0 auto;background:var(--surface);border-radius:14px 14px 0 0;max-height:85%;overflow:auto;
+  padding-block:16px calc(16px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:12px}
+.sheet .card{width:min(100%,260px);min-height:280px;align-self:center}
+.sheet .card .cn{font-size:1.2rem}
+.sheet .card .pw li{font-size:.85rem}
+.sheet .card .how{font-size:.8rem}
+.menu{display:flex;flex-direction:column;gap:14px;padding-top:18px}
+.menu .btn{text-align:left;padding:14px 16px}
+.rules dt{font-family:var(--display);font-weight:700;margin-top:6px}
+.rules dd{margin:0 0 6px;color:var(--muted)}
+.final{display:grid;grid-template-columns:1fr auto auto;gap:4px 14px;font-variant-numeric:tabular-nums}
+.final .h{font-weight:700}
+.starfield{height:90px;border-radius:12px;background:var(--sunk);position:relative;overflow:hidden}
+.starfield canvas{width:100%;height:100%;display:block}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+<div id="app"></div>
+<div id="sheet"></div>
+<script>
+(function(){
+/* ======================= CARDS ======================= */
+// [name, kind(S start, W world, M military world, D development), cost/defense, vp, good, prod(p production, w windfall, n none), powers, copies]
+const ROWS=[
+["Landing Colony","S",0,1,"ore","p","exp1"],["Frontier Fort","S",0,1,null,"n","mil2"],["Old Earth Archive","S",0,1,"tech","w","trade1"],
+["Seedship Harbor","S",0,1,"bio","p",""],["Ruin Camp","S",0,0,"relic","w","mil1"],
+["Iron Moon","W",1,1,"ore","p","",2],["Slag Belt","W",2,1,"ore","p","pdraw1",1],["Copperfall","W",2,1,"ore","p","",2],["Foundry Rock","W",3,2,"ore","p","dev1",1],
+["Deep Core Mine","W",4,3,"ore","p","",1],["Fen World","W",2,1,"bio","p","",2],["Spore Garden","W",3,2,"bio","p","",1],["Verdant Shelf","W",4,2,"bio","p","sdraw1",1],
+["Mangrove Sea","W",5,3,"bio","p","cons1",1],["Signal Array","W",3,2,"tech","p","exp1",1],["Glass City","W",4,3,"tech","p","",1],["Lattice Station","W",5,3,"tech","p","trade1",1],
+["Machine Choir","W",6,4,"tech","p","ddraw1",1],["Silent Obelisk","W",5,4,"relic","p","",1],["Gate of Hours","W",6,5,"relic","p","exp1",1],
+["Crash Site","W",1,1,"ore","w","",2],["Drifting Hulk","W",2,1,"tech","w","",2],["Amber Fields","W",2,1,"bio","w","",2],["Buried Vault","W",3,2,"relic","w","",1],
+["Comet Cache","W",1,0,"ore","w","exp1",1],["Quiet Haven","W",1,1,null,"n","",2],["Pilgrim Rest","W",2,2,null,"n","",1],["Hollow Sun","W",3,2,null,"n","keep1",1],
+["Free Port","W",2,1,null,"n","trade1",1],["Lantern World","W",4,3,null,"n","dev1",1],
+["Pirate Roost","M",1,1,null,"n","",2],["Garrison Rock","M",2,1,null,"n","mil1",1],["Wolf Moon","M",2,1,"bio","w","",2],["Smuggler Den","M",2,1,"tech","w","trade1",1],
+["Rebel Bunkers","M",3,2,"ore","p","",1],["Iron Bastion","M",3,2,null,"n","mil1",1],["Siege Moon","M",3,2,"tech","p","",1],["Dragon Reef","M",4,2,"bio","p","",1],
+["Warlord Throne","M",4,3,null,"n","",1],["Xeno Hive","M",5,3,"relic","w","",1],["Fortress Ceres","M",5,4,null,"n","mil1",1],["Shatter Gate","M",6,5,"relic","p","",1],
+["Scout Drones","D",1,1,null,null,"exp1",2],["Militia","D",1,1,null,null,"mil1",2],["Trade Guild","D",2,1,null,null,"trade1",2],["Bazaar Ring","D",2,1,null,null,"cons1",2],
+["Fabricators","D",2,1,null,null,"dev1",2],["Research Lab","D",2,1,null,null,"ddraw1",2],["Colony Ships","D",2,1,null,null,"sdraw1",2],["Patrol Fleet","D",3,2,null,null,"mil2",2],
+["Shipyards","D",3,2,null,null,"set1",2],["Export Office","D",3,2,null,null,"pdraw1",2],["Feast Halls","D",3,2,null,null,"cons1 trade1",1],["Robot Works","D",3,2,null,null,"dev1 ddraw1",1],
+["Deep Survey","D",3,1,null,null,"exp2",1],["Strike Carriers","D",4,2,null,null,"mil3",1],["Archive Net","D",4,2,null,null,"keep1 exp1",1],["Settler Corps","D",4,2,null,null,"set1 sdraw1",1],
+["Replicators","D",4,3,null,null,"pdraw1 trade1",1],["Merchant League","D",4,3,null,null,"trade2",1],["Banking Hub","D",5,3,null,null,"trade1 cons1",1],["Orbital Arsenal","D",5,3,null,null,"mil2 set1",1],
+["Grand Senate","D",6,0,null,null,"bonus:senate",1],["War Council","D",6,0,null,null,"bonus:war",1],["Free Trade Charter","D",6,0,null,null,"bonus:tech",1],
+["Garden Consortium","D",6,0,null,null,"bonus:bio",1],["Ore Barons","D",6,0,null,null,"bonus:ore",1],["Relic Seekers","D",6,0,null,null,"bonus:relic",1],
+["Imperial Census","D",6,0,null,null,"bonus:worlds",1],["Star Atlas","D",6,0,null,null,"bonus:size",1],["Victory Mint","D",6,0,null,null,"bonus:chips",1],
+];
+const C={},DECKLIST=[],STARTS=[];
+ROWS.forEach(r=>{const id=r[0].toLowerCase().replace(/[^a-z]+/g,"-");const pw={};let bonus=null;
+  (r[6]||"").split(" ").filter(Boolean).forEach(t=>{if(t.startsWith("bonus:"))bonus=t.slice(6);else{const m=t.match(/^([a-z]+)(\d+)$/);pw[m[1]]=+m[2];}});
+  C[id]={id,n:r[0],k:r[1],cost:r[2],vp:r[3],good:r[4],prod:r[5],pw,bonus};
+  if(r[1]==="S")STARTS.push(id);else for(let i=0;i<(r[7]||1);i++)DECKLIST.push(id);});
+const GN={ore:"Ore",bio:"Bio",tech:"Tech",relic:"Relic"};const GV={ore:2,bio:3,tech:4,relic:5};
+const BONUS={senate:["+1 VP per development",P=>tabC(P).filter(c=>c.k==="D").length],
+  war:["+1 VP per military world, +1 per 2 Military",P=>tabC(P).filter(c=>c.k==="M").length+Math.floor(mil(P)/2)],
+  tech:["+2 VP per Tech world",P=>2*tabC(P).filter(c=>c.good==="tech").length],
+  bio:["+2 VP per Bio world",P=>2*tabC(P).filter(c=>c.good==="bio").length],
+  ore:["+2 VP per Ore world",P=>2*tabC(P).filter(c=>c.good==="ore").length],
+  relic:["+3 VP per Relic world",P=>3*tabC(P).filter(c=>c.good==="relic").length],
+  worlds:["+1 VP per world",P=>tabC(P).filter(c=>c.k!=="D").length],
+  size:["+1 VP per 2 cards in your tableau",P=>Math.floor(P.tab.length/2)],
+  chips:["+1 VP per 3 VP chips",P=>Math.floor(P.chips/3)]};
+// powers as [phase tag, text]
+const PWT={exp:n=>["Explore",`Look at ${n} more card${n>1?"s":""}`],keep:n=>["Explore",`Keep ${n} more card${n>1?"s":""}`],dev:n=>["Develop",`Developments cost you ${n} less`],set:n=>["Settle",`Worlds cost you ${n} less (not military)`],
+  sdraw:n=>["Settle",`Draw ${n} after settling`],ddraw:n=>["Develop",`Draw ${n} after developing`],mil:n=>["Military",`+${n} Military strength`],trade:n=>["Trade",`+${n} card${n>1?"s":""} when selling`],
+  cons:n=>["Trade",`+${n} VP when cashing in`],pdraw:n=>["Produce",`Draw ${n}`]};
+const powers=c=>{const r=Object.entries(c.pw).map(([k,v])=>PWT[k](v));if(c.bonus)r.push(["End",BONUS[c.bonus][0]]);return r;};
+function cardText(c){return powers(c).map(([t,s])=>`${t}: ${s}`).join(". ");}
+const kindOf=c=>c.k==="D"?"dev":c.k==="M"?"mil":"world";
+const gvar=c=>`var(--${c.good||(c.k==="D"?"dev":c.k==="M"?"mil":"none")})`;
+const ICON={world:`<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="5.5" fill="currentColor"/><ellipse cx="10" cy="10" rx="9.2" ry="3" fill="none" stroke="currentColor" stroke-width="1.5" transform="rotate(-22 10 10)"/></svg>`,
+  mil:`<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5 17.5 4.5v5.5c0 4.3-3.2 7.3-7.5 8.5-4.3-1.2-7.5-4.2-7.5-8.5V4.5z" fill="currentColor"/></svg>`,
+  dev:`<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 17 6v8l-7 4-7-4V6z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.6" fill="currentColor"/></svg>`};
+function kindLabel(c){return c.k==="D"?(c.cost===6?"Grand development":"Development"):c.k==="M"?"Military world":c.k==="S"?"Home world":"World";}
+function howLine(c){if(c.k==="S")return "Your starting world";
+  const price=c.cost?`pay <b>${c.cost} card${c.cost===1?"":"s"}</b> from your hand`:"<b>free</b>";
+  if(c.k==="M")return `Claim in Settle · <b>free</b> if you have <b>${c.cost}+ Military</b>`;
+  if(c.k==="D")return `Build in Develop · ${price}`;
+  return `Claim in Settle · ${price}`;}
+function goodLine(c){if(c.k==="D")return `<span class="gl no">Tableau power</span>`;
+  if(!c.good)return `<span class="gl no">No goods</span>`;
+  return c.prod==="p"?`<span class="gl"><i></i>Makes ${GN[c.good]} goods</span>`:`<span class="gl wf"><i></i>${GN[c.good]} windfall</span>`;}
+function cardHTML(id,x=""){const c=C[id];const k=kindOf(c);const pw=powers(c);
+  return `<div class="card k-${k} ${c.k==="D"&&c.cost===6?"grand":""} ${x}" style="--g:${gvar(c)}">
+  <div class="band">${ICON[k]}<span class="kl">${c.k==="D"&&c.cost===6?"Grand dev":kindLabel(c)}${c.good&&k!=="dev"?" · "+GN[c.good]:""}</span><span class="cost">${c.cost}</span></div>
+  <div class="body"><div class="cn">${c.n}</div><div class="how">${howLine(c)}</div>
+  ${pw.length?`<ul class="pw">${pw.map(([t,s])=>`<li><span class="tag ${t==="End"?"end":t==="Military"?"mil":""}">${t==="End"?"Game end":t}</span>${s}</li>`).join("")}</ul>`:`<div class="pw"></div>`}
+  <div class="foot">${goodLine(c)}<span class="vp">${c.bonus?"? VP":c.vp+" VP"}</span></div></div></div>`;}
+
+/* ======================= STATE ======================= */
+const PH=["explore","develop","settle","trade","produce"];
+const PHN={explore:"Explore",develop:"Develop",settle:"Settle",trade:"Trade",produce:"Produce"};
+const PHD={explore:["Everyone draws 2, keeps 1.","You draw 2 more and keep 1 more."],develop:["Everyone may build 1 development.","Yours costs 1 less."],
+  settle:["Everyone may claim 1 world.","You draw 1 card after settling."],trade:["Everyone cashes in goods for 1 VP each.","You first sell 1 good for cards."],
+  produce:["Production worlds make goods.","You also fill 1 empty windfall world."]};
+const RIVALS=["The Vesper Compact","House Arrandel","The Mirrin Combine","Free Worlds of Oro","The Sable Directorate"];
+const POOL=24, LIMIT=12, HANDMAX=10;
+let S;
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+const tabC=P=>P.tab.map(t=>C[t.id]);
+const pw=(P,k)=>tabC(P).reduce((a,c)=>a+(c.pw[k]||0),0);
+const mil=P=>pw(P,"mil");
+function save(){try{localStorage.setItem("starward-v1",JSON.stringify(S));}catch(e){}}
+function draw1(){const g=S.g;if(!g.deck.length){if(!g.disc.length)return null;g.deck=shuffle(g.disc);g.disc=[];log("The deck was reshuffled.");}return g.deck.pop();}
+function draw(P,n){for(let i=0;i<n;i++){const c=draw1();if(c)P.hand.push(c);}}
+function log(t){S.g.log.unshift(t);S.g.log.length=Math.min(40,S.g.log.length);}
+function newGame(){const st=shuffle(STARTS.slice());
+  const mk=(id,name)=>({name,hand:[],tab:[{id,good:C[id].prod==="w"}],chips:0});
+  S.g={round:1,pool:POOL,deck:shuffle(DECKLIST.slice()),disc:[],p:mk(st[0],"You"),a:mk(st[1],rnd(RIVALS)),ch:{},queue:[],step:{t:"choose"},log:[],over:false,cur:null};
+  draw(S.g.p,4);draw(S.g.a,4);log(`You found ${C[st[0]].n}. ${S.g.a.name} holds ${C[st[1]].n}.`);S.screen="game";save();render();}
+function score(P){let s=P.chips;const br={chips:P.chips,cards:0,bonus:0};tabC(P).forEach(c=>{br.cards+=c.vp;if(c.bonus)br.bonus+=BONUS[c.bonus][1](P);});return {total:br.chips+br.cards+br.bonus,...br};}
+
+/* ======================= RULES ======================= */
+function devCost(P,c,chooser){return Math.max(0,c.cost-pw(P,"dev")-(chooser?1:0));}
+function worldCost(P,c){return c.k==="M"?0:Math.max(0,c.cost-pw(P,"set"));}
+function canPlace(P,id,phase,chooser){const c=C[id];
+  if(phase==="develop"){if(c.k!=="D"||P.tab.some(t=>t.id===id))return false;return P.hand.length-1>=devCost(P,c,chooser);}
+  if(c.k==="W")return P.hand.length-1>=worldCost(P,c);if(c.k==="M")return mil(P)>=c.cost;return false;}
+function place(P,id,payIds,phase,chooser){const c=C[id];const g=S.g;
+  P.hand.splice(P.hand.indexOf(id),1);payIds.forEach(x=>{const i=P.hand.indexOf(x);if(i>=0){P.hand.splice(i,1);g.disc.push(x);}});
+  P.tab.push({id,good:c.prod==="w"});log(`${P.name} ${phase==="develop"?"developed":c.k==="M"?"conquered":"settled"} ${c.n}.`);
+  if(phase==="develop")draw(P,pw(P,"ddraw"));else draw(P,pw(P,"sdraw")+(chooser?1:0));}
+function pay(P,cost,exclude){return P.hand.filter(x=>x!==exclude).map(x=>({x,v:val(P,x)})).sort((a,b)=>a.v-b.v).slice(0,cost).map(o=>o.x);}
+function sell(P,ti){const t=P.tab[ti];const c=C[t.id];t.good=false;const n=GV[c.good]+pw(P,"trade");draw(P,n);log(`${P.name} sold ${GN[c.good]} for ${n} cards.`);}
+function consume(P){const n=P.tab.filter(t=>t.good).length;if(!n)return;P.tab.forEach(t=>t.good=false);const v=n+pw(P,"cons");P.chips+=v;S.g.pool-=v;log(`${P.name} cashed in ${n} good${n>1?"s":""} for ${v} VP.`);}
+function produce(P,chooser,wi){let n=0;P.tab.forEach(t=>{const c=C[t.id];if(c.prod==="p"&&!t.good){t.good=true;n++;}});
+  if(chooser){const w=wi!=null?wi:P.tab.findIndex(t=>C[t.id].prod==="w"&&!t.good);if(w>=0&&!P.tab[w].good){P.tab[w].good=true;n++;}}
+  const d=pw(P,"pdraw");draw(P,d);if(n||d)log(`${P.name} produced ${n} good${n===1?"":"s"}${d?` and drew ${d}`:""}.`);}
+
+/* ======================= RIVAL AI ======================= */
+function val(P,id){const c=C[id];let v=c.vp+Object.values(c.pw).reduce((a,b)=>a+b,0)*.8;
+  if(c.bonus){const b=BONUS[c.bonus][1](P);v=2+b*.8;}
+  if(c.k==="M")v+=mil(P)>=c.cost?2.5:-1.5;
+  if(c.k==="W"&&c.prod==="p")v+=1;
+  if(c.k==="D"&&P.tab.some(t=>t.id===id))v-=5;
+  v-=Math.max(0,c.cost-P.hand.length)*.6;return v;}
+function aiBest(P,phase,chooser){const opts=P.hand.filter(id=>canPlace(P,id,phase,chooser)).map(id=>({id,v:val(P,id)+(C[id].cost===6?2:0)})).sort((a,b)=>b.v-a.v);return opts[0]||null;}
+function aiChoose(){const P=S.g.a;const sc={};
+  const goods=P.tab.filter(t=>t.good).length;const empty=P.tab.filter(t=>C[t.id].prod==="p"&&!t.good).length;
+  sc.explore=P.hand.length<3?6:P.hand.length<5?2:.5;
+  const d=aiBest(P,"develop",true);sc.develop=d?3+d.v*.5:0;
+  const s=aiBest(P,"settle",true);sc.settle=s?3.4+s.v*.5:0;
+  sc.produce=empty>=1?1.5+empty*1.2-goods*.5:0;
+  sc.trade=goods?1+goods*1.4+(P.hand.length<3?2:0):0;
+  if(S.g.pool<8)sc.trade+=goods;
+  let best="explore",bv=-9;for(const k of PH){const v=sc[k]+Math.random()*1.2;if(v>bv){bv=v;best=k;}}return best;}
+function aiExplore(P,chooser){const n=2+pw(P,"exp")+(chooser?2:0),k=1+pw(P,"keep")+(chooser?1:0);const got=[];for(let i=0;i<n;i++){const c=draw1();if(c)got.push(c);}
+  got.sort((a,b)=>val(P,b)-val(P,a));P.hand.push(...got.slice(0,k));S.g.disc.push(...got.slice(k));}
+function aiPlace(P,phase,chooser){const b=aiBest(P,phase,chooser);if(!b)return;const c=C[b.id];const cost=phase==="develop"?devCost(P,c,chooser):worldCost(P,c);
+  place(P,b.id,pay(P,cost,b.id),phase,chooser);}
+function aiTrade(P,chooser){if(chooser){let bi=-1,bv=0;P.tab.forEach((t,i)=>{if(t.good&&GV[C[t.id].good]>bv&&(P.hand.length<6||S.g.pool>10)){bv=GV[C[t.id].good];bi=i;}});if(bi>=0)sell(P,bi);}consume(P);}
+function aiDiscard(P){while(P.hand.length>HANDMAX){const w=P.hand.map(x=>({x,v:val(P,x)})).sort((a,b)=>a.v-b.v)[0].x;P.hand.splice(P.hand.indexOf(w),1);S.g.disc.push(w);}}
+
+/* ======================= ROUND FLOW ======================= */
+function choose(ph){const g=S.g;g.ch={p:ph,a:aiChoose()};log(`You chose ${PHN[ph]}. ${g.a.name} chose ${PHN[g.ch.a]}.`);
+  g.queue=PH.filter(x=>x===g.ch.p||x===g.ch.a);g.step=null;advance();}
+function advance(){const g=S.g;
+  while(!g.step&&g.queue.length){const ph=g.queue.shift();g.cur=ph;const pc=g.ch.p===ph,ac=g.ch.a===ph;
+    if(ph==="explore"){aiExplore(g.a,ac);const n=2+pw(g.p,"exp")+(pc?2:0),k=1+pw(g.p,"keep")+(pc?1:0);const got=[];for(let i=0;i<n;i++){const c=draw1();if(c)got.push(c);}
+      g.step={t:"explore",cards:got,keep:Math.min(k,got.length),sel:[]};}
+    else if(ph==="develop"||ph==="settle"){aiPlace(g.a,ph,ac);
+      if(g.p.hand.some(id=>canPlace(g.p,id,ph,pc)))g.step={t:"place",ph,chooser:pc,target:null,pay:[]};else log(`You had nothing to ${ph==="develop"?"develop":"settle"}.`);}
+    else if(ph==="trade"){aiTrade(g.a,ac);if(pc&&g.p.tab.some(t=>t.good))g.step={t:"sell"};else consume(g.p);}
+    else if(ph==="produce"){produce(g.a,ac);const empties=g.p.tab.map((t,i)=>C[t.id].prod==="w"&&!t.good?i:-1).filter(i=>i>=0);
+      if(pc&&empties.length>1)g.step={t:"windfall",opts:empties};else produce(g.p,pc);}
+  }
+  if(!g.step&&!g.queue.length)endRound();save();render();}
+function endRound(){const g=S.g;aiDiscard(g.a);g.cur=null;
+  if(g.p.hand.length>HANDMAX){g.step={t:"discard",n:g.p.hand.length-HANDMAX,sel:[]};return;}
+  finishRound();}
+function finishRound(){const g=S.g;
+  if(g.pool<=0||g.p.tab.length>=LIMIT||g.a.tab.length>=LIMIT){g.over=true;g.step=null;const a=score(g.p).total,b=score(g.a).total;if(a>=b)S.rec.w++;else S.rec.l++;log("The race is over.");return;}
+  g.round++;g.step={t:"choose"};}
+
+/* ======================= RENDER ======================= */
+const $=s=>document.querySelector(s);
+function tile(t,i,who,x=""){const c=C[t.id];const k=kindOf(c);
+  const short=k==="dev"?(c.cost===6?"Grand":"Dev"):k==="mil"?"Military":"World";
+  const slot=c.good?`<i class="slot ${t.good?"full":""}" aria-hidden="true"></i>`:"";
+  const gtxt=t.good?`<span class="gr">${GN[c.good]} good</span>`:"";
+  return `<button class="tile k-${k} ${c.good?"can-good":""} ${t.good?"has-good":""} ${x}" style="--g:${gvar(c)}" data-info="${t.id}" aria-label="${c.n}, ${kindLabel(c)}${t.good?", holding a "+GN[c.good]+" good":c.good?", no good right now":""}">${slot}<span class="th">${ICON[k]}${short}</span><span class="tn">${c.n}</span><span class="tm">${gtxt||(c.bonus?"?":c.vp)+" VP"}</span></button>`;}
+function render(){({menu:rMenu,game:rGame,rules:rRules})[S.screen||"menu"]();}
+function rMenu(){const g=S.g;$("#app").innerHTML=`<div class="menu"><div class="starfield"><canvas id="sf"></canvas></div><div class="label">A race to build a star empire</div><h1>Starward</h1>
+  <p class="desc">Each round you and a rival pick one phase in secret. Both of you play every phase that was picked, but the one who picked it gets a bonus. Cards are your money and your empire.</p>
+  <p class="num"><b>Wins ${S.rec.w}</b> · Losses ${S.rec.l}</p>
+  ${g&&!g.over?`<button class="btn" data-go="resume">Continue game · Round ${g.round}</button>`:""}
+  <button class="btn ${g&&!g.over?"ghost":""}" data-new>New game</button><button class="btn ghost" data-go="rules">How to play</button></div>`;stars();}
+function stars(){const cv=$("#sf");if(!cv)return;const r=cv.getBoundingClientRect();cv.width=r.width*2;cv.height=r.height*2;const x=cv.getContext("2d");
+  const cs=getComputedStyle(document.documentElement);const cols=["--ink","--accent","--tech","--relic"].map(k=>cs.getPropertyValue(k).trim());
+  for(let i=0;i<140;i++){x.fillStyle=cols[i%11===0?1:i%17===0?2:i%23===0?3:0];x.globalAlpha=.3+Math.random()*.7;const s=Math.random()<.08?3:1.4;x.fillRect(Math.random()*cv.width,Math.random()*cv.height,s,s);}
+  x.globalAlpha=.9;x.strokeStyle=cols[1];x.lineWidth=2;x.beginPath();const pts=[[.1,.7],[.3,.4],[.5,.55],[.72,.25],[.9,.35]];pts.forEach(([a,b],i)=>{const X=a*cv.width,Y=b*cv.height;i?x.lineTo(X,Y):x.moveTo(X,Y);});x.stroke();
+  pts.forEach(([a,b])=>{x.fillStyle=cols[1];x.beginPath();x.arc(a*cv.width,b*cv.height,5,0,7);x.fill();});}
+function rRules(){$("#app").innerHTML=`<div class="row"><h2>How to play</h2><button class="btn ghost small" data-go="menu">Back</button></div>
+  <section><div class="label">Three kinds of cards</div><dl class="rules">
+  <dt>World · round card, planet icon, colored by its good</dt><dd>Claim it in Settle by discarding cards equal to its cost (round token). Many make goods.</dd>
+  <dt>Military world · red striped band, shield icon</dt><dd>Claim it in Settle for free, but only if your Military is at least its defense (shield token).</dd>
+  <dt>Development · purple card, hex icon</dt><dd>Build it in Develop by discarding cards equal to its cost (square token). Gives a power for the rest of the game.</dd></dl>
+  <div class="pickgrid">${["glass-city","pirate-roost","trade-guild","grand-senate"].map(id=>cardHTML(id)).join("")}</div>
+  <p class="desc" style="margin-top:8px">Power tags show which phase they work in. A filled diamond means the world makes goods every Produce. An outlined diamond means a windfall world, which only fills when you pick Produce.</p></section>
+  <dl class="rules">
+  <dt>The goal</dt><dd>Score the most VP. The game ends after the round where someone has ${LIMIT} cards in their tableau or the ${POOL} VP chips run out.</dd>
+  <dt>Cards are money</dt><dd>To place a card, discard other cards from your hand equal to its cost. Military worlds are free, but your Military must be at least their defense (⚔).</dd>
+  <dt>Each round</dt><dd>You and the rival each pick one phase in secret. Every picked phase happens for both players, in order. Whoever picked it gets the bonus.</dd>
+  ${PH.map(p=>`<dt>${PHN[p]}</dt><dd>${PHD[p][0]} Bonus: ${PHD[p][1]}</dd>`).join("")}
+  <dt>Goods</dt><dd>In your empire, a world holding a good is tinted in its color, shows a solid glowing diamond in its corner, and says "Tech good" (or Ore, Bio, Relic). A dashed diamond means the world can hold a good but is empty right now. In Trade, selling a good pays Ore 2, Bio 3, Tech 4, Relic 5 cards. Every other good cashes in for 1 VP.</dd>
+  <dt>Grand developments</dt><dd>The 6-cost developments score bonus VP at the end based on your tableau.</dd>
+  <dt>Hand limit</dt><dd>${HANDMAX} cards at the end of each round.</dd></dl>`;}
+function rGame(){const g=S.g;if(!g){S.screen="menu";return rMenu();}
+  const sp=score(g.p),sa=score(g.a);const st=g.step;
+  const sideStats=P=>`<b>${P.hand.length}</b> cards · <b>${P.tab.filter(t=>t.good).length}</b> goods · <b>${mil(P)}</b> military · <b>${P.chips}</b> chips · <b>${P.tab.length}/${LIMIT}</b> tableau`;
+  const gN=g.p.tab.filter(t=>t.good).length, prodN=g.p.tab.filter(t=>C[t.id].prod==="p"&&!t.good).length;
+  const xtra={trade:gN?` You have ${gN} good${gN>1?"s":""}.`:" You have no goods yet.",produce:` ${prodN} of your worlds would make a good.`};
+  let panel="";
+  if(g.over){const rows=[["VP chips","chips"],["Card VP","cards"],["Grand bonuses","bonus"],["Total","total"]];const win=sp.total>=sa.total;
+    panel=`<div class="panel"><div class="label">Round ${g.round} · Race over</div><h2>${win?"Your empire leads the stars":g.a.name+" claims the stars"}</h2>
+    <div class="final"><span class="h"></span><span class="h">You</span><span class="h">Rival</span>${rows.map(([n,k])=>`<span${k==="total"?' class="h"':""}>${n}</span><span${k==="total"?' class="h"':""}>${sp[k]}</span><span${k==="total"?' class="h"':""}>${sa[k]}</span>`).join("")}</div>
+    <div class="btns"><button class="btn" data-new>New game</button><button class="btn ghost" data-go="menu">Menu</button></div></div>`;}
+  else if(st.t==="choose"){const hint=hintPhase();panel=`<div class="panel"><div class="label">Round ${g.round}</div><h2>Choose your phase</h2><div class="acts">${PH.map(p=>`<button class="act ${hint===p?"hint":""}" data-choose="${p}"><b>${PHN[p]}</b><span>${PHD[p][0]}${xtra[p]?`<b style="font-size:.82rem;font-family:var(--body);color:var(--ink)">${xtra[p]}</b>`:""} <b style="font-size:.82rem;font-family:var(--body)">Bonus:</b> ${PHD[p][1]}</span></button>`).join("")}</div></div>`;}
+  else if(st.t==="explore"){panel=`<div class="panel"><div class="label">Explore</div><h2>Keep ${st.keep} of ${st.cards.length}</h2><div class="pickgrid">${st.cards.map((id,i)=>`<button data-exp="${i}">${cardHTML(id,st.sel.includes(i)?"sel":"")}</button>`).join("")}</div>
+    <button class="btn" data-keep ${st.sel.length===st.keep?"":"disabled"}>Keep ${st.sel.length}/${st.keep}</button></div>`;}
+  else if(st.t==="place"){const P=g.p;const isDev=st.ph==="develop";
+    if(!st.target)panel=`<div class="panel"><div class="label">${PHN[st.ph]}${st.chooser?" · your bonus":""}</div><h2>${isDev?"Pick a development to build":"Pick a world to claim"}</h2><p class="desc">Highlighted cards in your hand can be placed. Military ${mil(P)}.</p><div class="btns"><button class="btn ghost" data-skip>Skip</button></div></div>`;
+    else{const c=C[st.target];const cost=isDev?devCost(P,c,st.chooser):worldCost(P,c);
+      const ti=st.ti!=null?st.ti:P.hand.indexOf(st.target);
+      panel=`<div class="panel"><div class="label">${PHN[st.ph]}</div><h2>${c.k==="M"?`Conquer ${c.n}`:cost?`Place ${c.n} · pay ${cost}`:`Place ${c.n} · free`}</h2>
+      <p class="desc">${c.k==="M"?`Your Military ${mil(P)} beats its defense ${c.cost}. No cards needed.`:cost?`Tap ${cost} card${cost>1?"s":""} to discard as payment. <b class="num">${st.pay.length}/${cost}</b> chosen.`:"No payment needed."}</p>
+      ${cost>0?`<div class="pickgrid paygrid">${P.hand.map((id,i)=>i===ti?"":`<button data-payi="${i}" aria-pressed="${st.pay.includes(i)}">${cardHTML(id,st.pay.includes(i)?"pay":"")}</button>`).join("")}</div>`:""}
+      <div class="btns"><button class="btn ghost" data-untarget>Back</button>${cost>0?`<button class="btn ghost" data-autopay>${st.pay.length?"Clear":"Pick cheapest"}</button>`:""}<button class="btn" data-place ${st.pay.length===cost?"":"disabled"}>Place it</button></div></div>`;}}
+  else if(st.t==="sell"){panel=`<div class="panel"><div class="label">Trade · your bonus</div><h2>Sell one good for cards</h2><div class="goods">${g.p.tab.map((t,i)=>t.good?`<button class="goodbtn ${C[t.id].good}" data-sell="${i}"><i></i>${C[t.id].n} · ${GV[C[t.id].good]+pw(g.p,"trade")} cards</button>`:"").join("")}</div>
+    <p class="desc">Your other goods become 1 VP each after.</p><button class="btn ghost" data-sell="-1">Don't sell</button></div>`;}
+  else if(st.t==="windfall"){panel=`<div class="panel"><div class="label">Produce · your bonus</div><h2>Fill one windfall world</h2><div class="goods">${st.opts.map(i=>`<button class="goodbtn ${C[g.p.tab[i].id].good}" data-wf="${i}"><i></i>${C[g.p.tab[i].id].n}</button>`).join("")}</div></div>`;}
+  else if(st.t==="discard"){panel=`<div class="panel"><div class="label">End of round</div><h2>Discard ${st.n} card${st.n>1?"s":""}</h2><p class="desc">Hand limit is ${HANDMAX}. Tap cards in your hand.</p><button class="btn" data-disc ${st.sel.length===st.n?"":"disabled"}>Discard ${st.sel.length}/${st.n}</button></div>`;}
+  // hand marking
+  const hand=g.p.hand.map((id,i)=>{let x="";
+    if(st&&st.t==="place"){if(!st.target)x=canPlace(g.p,id,st.ph,st.chooser)?"ok":"dim";else if(id===st.target)x="sel";else if(st.pay.includes(i))x="pay";}
+    if(st&&st.t==="discard"&&st.sel.includes(i))x="pay";
+    return `<button data-hand="${i}" aria-label="${C[id].n}">${cardHTML(id,x)}</button>`;}).join("");
+  $("#app").innerHTML=`
+  <div class="row"><button class="btn ghost small" data-go="menu">Menu</button><span class="label num">Round ${g.round} · Deck ${g.deck.length}</span></div>
+  <div class="score"><div class="side"><span class="label">You</span><b class="num">${sp.total}</b></div><div class="pool"><span class="label">VP chips left</span><br><b class="num">${Math.max(0,g.pool)}</b></div><div class="side r"><span class="label">${g.a.name.split(" ").slice(-1)[0]}</span><b class="num">${sa.total}</b></div></div>
+  <div class="track">${PH.map(p=>{const by=[g.ch.p===p&&"You",g.ch.a===p&&"Rival"].filter(Boolean).join("+");const on=(!st||st.t!=="choose")&&by;return `<div class="ph ${on?"on":""} ${g.cur===p?"now":""}">${PHN[p]}<span class="who">${on?by:""}</span></div>`;}).join("")}</div>
+  <section class="rival"><div class="row" style="margin-bottom:6px"><h2 style="font-size:.95rem">${g.a.name}</h2></div><div class="stats" style="margin-bottom:6px">${sideStats(g.a)}</div><div class="tab">${g.a.tab.map((t,i)=>tile(t,i)).join("")}</div></section>
+  ${panel}
+  <div class="log">${g.log.slice(0,3).map(l=>`<p>${l}</p>`).join("")}</div>
+  <section><div class="row" style="margin-bottom:6px"><h2 style="font-size:.95rem">Your empire</h2><span class="goodkey"><span><i class="full"></i>Has a good</span><span><i class="empty"></i>Empty</span></span></div><div class="stats" style="margin-bottom:6px">${sideStats(g.p)}</div><div class="tab">${g.p.tab.map((t,i)=>tile(t,i)).join("")}</div></section>
+  <section><div class="label">Your hand · ${g.p.hand.length}</div><div class="hand">${hand||'<p class="desc">No cards. Explore or Trade to get more.</p>'}</div></section>`;}
+function hintPhase(){const P=S.g.p;if(P.hand.length<2)return "explore";const goods=P.tab.filter(t=>t.good).length;if(goods>=2)return "trade";
+  if(P.hand.some(id=>C[id].k!=="D"&&canPlace(P,id,"settle",true)))return "settle";if(P.hand.some(id=>canPlace(P,id,"develop",true)))return "develop";
+  if(P.tab.some(t=>C[t.id].prod==="p"&&!t.good))return "produce";return "explore";}
+function sheet(id){$("#sheet").innerHTML=`<div class="sheet-bg" data-close><div class="sheet">${cardHTML(id)}<button class="btn ghost" data-close>Close</button></div></div>`;}
+
+/* ======================= INPUT ======================= */
+function payCost(){const g=S.g,st=g.step,c=C[st.target];return st.ph==="develop"?devCost(g.p,c,st.chooser):worldCost(g.p,c);}
+function togglePay(i){const st=S.g.step;const cost=payCost();
+  if(st.pay.includes(i))st.pay.splice(st.pay.indexOf(i),1);else if(st.pay.length<cost)st.pay.push(i);else{st.pay.shift();st.pay.push(i);}}
+document.addEventListener("click",e=>{
+  if(e.target.closest("[data-close]")&&(e.target.matches(".sheet-bg")||e.target.closest("button[data-close]"))){$("#sheet").innerHTML="";return;}
+  const t=e.target.closest("button");if(!t)return;const d=t.dataset;const g=S.g;
+  if(d.go){if(d.go==="resume")S.screen="game";else S.screen=d.go;save();window.scrollTo(0,0);return render();}
+  if(d.new!==undefined)return newGame();
+  if(d.info&&!d.hand)return sheet(d.info);
+  if(!g||g.over)return;const st=g.step;
+  if(d.choose)return choose(d.choose);
+  if(d.exp!=null){const i=+d.exp;const s=st.sel;if(s.includes(i))s.splice(s.indexOf(i),1);else{if(s.length>=st.keep)s.shift();s.push(i);}return render();}
+  if(d.keep!==undefined){st.cards.forEach((c,i)=>(st.sel.includes(i)?g.p.hand:g.disc).push(c));log(`You kept ${st.sel.length} card${st.sel.length>1?"s":""}.`);g.step=null;return advance();}
+  if(d.skip!==undefined){g.step=null;return advance();}
+  if(d.untarget!==undefined){st.target=null;st.ti=null;st.pay=[];return render();}
+  if(d.payi!=null){togglePay(+d.payi);return render();}
+  if(d.autopay!==undefined){if(st.pay.length)st.pay=[];else{const ti=st.ti!=null?st.ti:g.p.hand.indexOf(st.target);
+    st.pay=g.p.hand.map((x,k)=>({k,v:val(g.p,x)})).filter(o=>o.k!==ti).sort((a,b)=>a.v-b.v).slice(0,payCost()).map(o=>o.k);}return render();}
+  if(d.place!==undefined){place(g.p,st.target,st.pay.map(i=>g.p.hand[i]),st.ph,st.chooser);g.step=null;return advance();}
+  if(d.sell!=null){if(+d.sell>=0)sell(g.p,+d.sell);consume(g.p);g.step=null;return advance();}
+  if(d.wf!=null){produce(g.p,true,+d.wf);g.step=null;return advance();}
+  if(d.disc!==undefined){st.sel.sort((a,b)=>b-a).forEach(i=>g.disc.push(...g.p.hand.splice(i,1)));g.step=null;finishRound();save();return render();}
+  if(d.hand!=null){const i=+d.hand,id=g.p.hand[i];
+    if(st&&st.t==="place"){
+      if(!st.target){if(canPlace(g.p,id,st.ph,st.chooser)){st.target=id;st.ti=i;st.pay=[];}else sheet(id);return render();}
+      if(i===(st.ti!=null?st.ti:g.p.hand.indexOf(st.target)))return sheet(id);togglePay(i);return render();}
+    if(st&&st.t==="discard"){if(st.sel.includes(i))st.sel.splice(st.sel.indexOf(i),1);else if(st.sel.length<st.n)st.sel.push(i);return render();}
+    return sheet(id);}
+});
+
+/* ======================= BOOT ======================= */
+function start(data){S=data&&data.S;if(!S){try{S=JSON.parse(localStorage.getItem("starward-v1"));}catch(e){S=null;}}
+  if(!S||!S.rec)S={screen:"menu",rec:{w:0,l:0},g:null};render();}
+window.claude?.hot?.snapshot?.(()=>({S}));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+
+</body></html>
