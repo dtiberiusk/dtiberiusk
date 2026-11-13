@@ -129,6 +129,11 @@ header {
   border: 4px solid #1a2a5e;
   display: block;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.top-image:hover {
+  transform: scale(1.1);
 }
 
 h1 {
