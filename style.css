@@ -84,8 +84,11 @@
   font-display: swap;
 }
 
-
 /* END FONT SETUP ---------------------------------------------*/ 
+
+html {
+  font-size: clamp(14px, 0.6rem + 0.6vw, 20px);
+}
 
 * {
   box-sizing: border-box;
