@@ -109,8 +109,8 @@ body {
   text-align: left;
   font-size: 1rem;
 
-  margin: 20px;
-  height: calc(100dvh - 40px);                 
+  margin: 1.25rem;
+  height: calc(100dvh - 2.5rem);                 
   border: 0.5rem solid #1a2a5e;     
   padding: 2rem;
   position: relative;
