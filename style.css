@@ -107,10 +107,11 @@ body {
   font-weight: 400;
   color: #1a2a5e;
   text-align: left;
+  font-size: 1rem;
 
   margin: 20px;
   height: calc(100dvh - 40px);                 
-  border: 8px solid #1a2a5e;     
+  border: 0.5rem solid #1a2a5e;     
   padding: 2rem;
   position: relative;
   
@@ -124,9 +125,9 @@ header {
 }
 
 .top-image {
-  width: 180px;
+  width: 10rem;
   height: auto;
-  border: 6px solid #1a2a5e;
+  border: 0.4rem solid #1a2a5e;
   display: block;
   flex-shrink: 0;
   transition: transform 0.2s ease;
@@ -141,6 +142,7 @@ h1 {
   font-weight: 700;
   font-style: normal;
   color: #1a2a5e;
+  font-size: 1.5rem;
   
 }
 
@@ -149,7 +151,7 @@ h2 {
   font-weight: 400;
   font-style: normal;
   color: #1a2a5e;
-  ont-size: 1.1rem; 
+  ont-size: 0.8rem; 
 }
 
 footer {
@@ -167,6 +169,7 @@ footer a {
   color: #1a2a5e;
   font-weight: 400;
   text-decoration: none;
+  font-size: 1.0rem;
   display: inline-block;
   transition: transform 0.2s ease;
 }
