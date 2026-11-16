@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Auto-Scroll Reader</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<style>
+  :root{
+    --bg:#1b1c1f; --panel:#26272b; --line:#3a3b40; --text:#e8e6e1; --muted:#9a9890;
+    --accent:#e0a458; --page-shadow:0 2px 14px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font:14px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+  body{display:flex;flex-direction:column}
+  header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:8px 14px;
+    background:var(--panel);border-bottom:1px solid var(--line);transition:opacity .3s}
+  body.reading header{opacity:.15}
+  body.reading header:hover{opacity:1}
+  .group{display:flex;align-items:center;gap:6px}
+  button,label.btn{background:#33343a;color:var(--text);border:1px solid var(--line);
+    border-radius:6px;padding:6px 11px;font:inherit;cursor:pointer;white-space:nowrap}
+  button:hover,label.btn:hover{border-color:var(--muted)}
+  button:disabled{opacity:.4;cursor:default}
+  #play{min-width:92px;background:var(--accent);color:#1b1c1f;border-color:var(--accent);font-weight:600}
+  #play.on{background:#33343a;color:var(--accent)}
+  input[type=range]{accent-color:var(--accent);width:150px}
+  .val{min-width:62px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .name{color:var(--muted);overflow:hidden;text-overflow:ellipsis;max-width:240px}
+  .spacer{flex:1}
+  #viewer{flex:1;overflow:auto;position:relative;outline:none}
+  #pages{display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 0 60vh}
+  .page{background:#fff;box-shadow:var(--page-shadow);position:relative}
+  .page canvas{display:block;width:100%;height:100%}
+  #drop{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px}
+  .dropbox{border:2px dashed var(--line);border-radius:14px;padding:48px 40px;text-align:center;max-width:460px}
+  .dropbox h1{font-size:20px;margin:0 0 8px;font-weight:600}
+  .dropbox p{color:var(--muted);margin:6px 0}
+  #viewer.dragging .dropbox{border-color:var(--accent)}
+  kbd{background:#33343a;border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:12px}
+  #progress{position:fixed;left:0;bottom:0;height:3px;background:var(--accent);width:0;z-index:5}
+  #err{color:#ff8a7a}
+  input[type=search],input[type=number]{background:#1b1c1f;color:var(--text);border:1px solid var(--line);
+    border-radius:6px;padding:6px 9px;font:inherit}
+  input[type=search]{width:170px}
+  input[type=number]{width:62px;text-align:center}
+  input:focus{outline:none;border-color:var(--accent)}
+  input:disabled{opacity:.4}
+  .hl{position:absolute;background:rgba(255,205,0,.38);mix-blend-mode:multiply;pointer-events:none;border-radius:2px}
+  .hl.cur{background:rgba(255,120,0,.55);box-shadow:0 0 0 2px #ff7a00}
+</style>
+</head>
+<body>
+<header>
+  <div class="group">
+    <label class="btn" for="file">Open PDF</label>
+    <input id="file" type="file" accept="application/pdf,.pdf" hidden>
+    <span class="name" id="fname"></span>
+  </div>
+  <div class="group">
+    <button id="play" disabled title="Space">▶ Scroll</button>
+  </div>
+  <div class="group" title="Scroll speed  (↑ / ↓ keys)">
+    <span>Speed</span>
+    <input id="speed" type="range" min="1" max="100" step="1" value="20">
+    <span class="val" id="speedVal"></span>
+  </div>
+  <div class="group" title="Zoom  (+ / − keys)">
+    <button id="zoomOut">−</button>
+    <span class="val" id="zoomVal" style="min-width:44px;text-align:center">100%</span>
+    <button id="zoomIn">+</button>
+    <button id="fit">Fit width</button>
+    <button id="rotate" title="Rotate 90° clockwise  (R key)">⟳ Rotate</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="group" title="Search text  (Ctrl/⌘+F, Enter = next, Shift+Enter = previous)">
+    <input id="q" type="search" placeholder="Search…" disabled>
+    <button id="prev" disabled>‹</button>
+    <button id="next" disabled>›</button>
+    <span class="val" id="hits" style="min-width:70px"></span>
+  </div>
+  <div class="group" title="Type a page number and press Enter">
+    <span>Page</span>
+    <input id="pageIn" type="number" min="1" value="1" disabled>
+    <span class="val" id="pageTotal" style="min-width:36px">/ –</span>
+  </div>
+  <button id="full" title="F">Full screen</button>
+</header>
+
+<div id="viewer" tabindex="0">
+  <div id="pages"></div>
+  <div id="drop">
+    <div class="dropbox">
+      <h1>Drop a PDF here</h1>
+      <p>or use <b>Open PDF</b> above. The file stays in your browser.</p>
+      <p style="margin-top:18px"><kbd>Space</kbd> play/pause &nbsp; <kbd>↑</kbd><kbd>↓</kbd> speed &nbsp; <kbd>+</kbd><kbd>−</kbd> zoom &nbsp; <kbd>F</kbd> full screen &nbsp; <kbd>R</kbd> rotate</p>
+      <p id="err"></p>
+    </div>
+  </div>
+</div>
+<div id="progress"></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const viewer = $('viewer'), pagesEl = $('pages'), drop = $('drop');
+  const playBtn = $('play'), speedIn = $('speed');
+
+  // Speed slider is non-linear so the slow end has fine control.
+  // value 1..100 → ~3 .. 400 px/s
+  const sliderToPx = v => Math.round(3 * Math.pow(400/3, (v-1)/99) * 10) / 10;
+  const store = {
+    get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+    set(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+  };
+  const saved = Number(store.get('pdfas-speed'));
+  if (saved >= 1 && saved <= 100) speedIn.value = saved;
+  const showSpeed = () => { $('speedVal').textContent = sliderToPx(+speedIn.value) + ' px/s'; };
+  showSpeed();
+  speedIn.addEventListener('input', () => { showSpeed(); store.set('pdfas-speed', speedIn.value); });
+
+  let pdf = null, pageInfo = [], scale = 1, fitMode = true, observer = null, renderToken = 0;
+  let rotation = 0; // extra rotation applied on top of each page's own rotation
+  const pageRot = p => (p.page.rotate + rotation) % 360;
+
+  // ---------- loading ----------
+  $('file').addEventListener('change', e => { const f = e.target.files[0]; if (f) openFile(f); });
+  viewer.addEventListener('dragover', e => { e.preventDefault(); viewer.classList.add('dragging'); });
+  viewer.addEventListener('dragleave', () => viewer.classList.remove('dragging'));
+  viewer.addEventListener('drop', e => {
+    e.preventDefault(); viewer.classList.remove('dragging');
+    const f = [...e.dataTransfer.files].find(f => /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name));
+    if (f) openFile(f);
+  });
+
+  async function openFile(file){
+    $('err').textContent = '';
+    stop();
+    try {
+      const data = new Uint8Array(await file.arrayBuffer());
+      if (pdf) pdf.destroy();
+      pdf = await pdfjsLib.getDocument({ data }).promise;
+      $('fname').textContent = file.name;
+      pageInfo = [];
+      for (let i = 1; i <= pdf.numPages; i++){
+        const p = await pdf.getPage(i);
+        const vp = p.getViewport({ scale: 1 });
+        pageInfo.push({ page: p, w: vp.width, h: vp.height, el: null, rendered: 0 });
+      }
+      drop.style.display = 'none';
+      playBtn.disabled = false;
+      fitMode = true;
+      rotation = 0;
+      textCache = null; matches = []; cur = -1; searchedQ = ''; $('q').value = ''; showHits();
+      ['q','prev','next','pageIn'].forEach(id => $(id).disabled = false);
+      $('pageIn').max = pdf.numPages;
+      $('pageTotal').textContent = '/ ' + pdf.numPages;
+      layout(0);
+      viewer.scrollTop = 0;
+      viewer.focus();
+    } catch (err) {
+      console.error(err);
+      $('err').textContent = 'Could not open that file: ' + (err.message || err);
+    }
+  }
+
+  // ---------- layout & lazy rendering ----------
+  function fitScale(){
+    const maxW = Math.max(...pageInfo.map(p => p.w));
+    return Math.max(0.25, (viewer.clientWidth - 48) / maxW);
+  }
+
+  function layout(keepFrac){
+    if (!pdf) return;
+    pageInfo.forEach(p => {
+      const vp = p.page.getViewport({ scale: 1, rotation: pageRot(p) });
+      p.w = vp.width; p.h = vp.height;
+    });
+    if (fitMode) scale = fitScale();
+    $('zoomVal').textContent = Math.round(scale * 100) + '%';
+    renderToken++;
+    if (observer) observer.disconnect();
+    pagesEl.innerHTML = '';
+    observer = new IntersectionObserver(entries => {
+      entries.forEach(en => { if (en.isIntersecting) renderPage(+en.target.dataset.i); });
+    }, { root: viewer, rootMargin: '150% 0px' });
+    pageInfo.forEach((p, i) => {
+      const d = document.createElement('div');
+      d.className = 'page';
+      d.dataset.i = i;
+      d.style.width = Math.floor(p.w * scale) + 'px';
+      d.style.height = Math.floor(p.h * scale) + 'px';
+      p.el = d; p.rendered = 0;
+      pagesEl.appendChild(d);
+      observer.observe(d);
+    });
+    if (matches.length) drawHighlights();
+    if (keepFrac != null) {
+      viewer.scrollTop = keepFrac * (viewer.scrollHeight - viewer.clientHeight);
+      pos = viewer.scrollTop;
+    }
+  }
+
+  async function renderPage(i){
+    const p = pageInfo[i], token = renderToken;
+    if (!p || p.rendered === token) return;
+    p.rendered = token;
+    const dpr = window.devicePixelRatio || 1;
+    const vp = p.page.getViewport({ scale: scale * dpr, rotation: pageRot(p) });
+    const c = document.createElement('canvas');
+    c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+    try {
+      await p.page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+      if (token !== renderToken) return;
+      const old = p.el.querySelector('canvas');
+      if (old) old.replaceWith(c); else p.el.prepend(c);
+    } catch (e) { p.rendered = 0; }
+  }
+
+  const scrollFrac = () => {
+    const max = viewer.scrollHeight - viewer.clientHeight;
+    return max > 0 ? viewer.scrollTop / max : 0;
+  };
+  function setZoom(s){
+    if (!pdf) return;
+    fitMode = false;
+    const f = scrollFrac();
+    scale = Math.min(5, Math.max(0.25, s));
+    layout(f);
+  }
+  $('zoomIn').onclick = () => setZoom(scale * 1.15);
+  $('zoomOut').onclick = () => setZoom(scale / 1.15);
+  $('fit').onclick = () => { if (!pdf) return; const f = scrollFrac(); fitMode = true; layout(f); };
+  $('rotate').onclick = () => {
+    if (!pdf) return;
+    const f = scrollFrac();
+    rotation = (rotation + 90) % 360;
+    layout(f);
+  };
+  let rT; window.addEventListener('resize', () => {
+    clearTimeout(rT); rT = setTimeout(() => { if (fitMode) layout(scrollFrac()); }, 150);
+  });
+
+  // ---------- auto scroll ----------
+  let running = false, last = 0, pos = 0, raf = 0;
+  function tick(t){
+    if (!running) return;
+    const dt = Math.min(0.1, (t - last) / 1000); last = t;
+    // If the user scrolled by hand, pick up from where they are.
+    if (Math.abs(viewer.scrollTop - Math.round(pos)) > 2) pos = viewer.scrollTop;
+    pos += sliderToPx(+speedIn.value) * dt;
+    const max = viewer.scrollHeight - viewer.clientHeight;
+    if (pos >= max) { pos = max; viewer.scrollTop = max; stop(); return; }
+    viewer.scrollTop = pos;
+    raf = requestAnimationFrame(tick);
+  }
+  function start(){
+    if (!pdf || running) return;
+    running = true; pos = viewer.scrollTop; last = performance.now();
+    playBtn.textContent = '❚❚ Pause'; playBtn.classList.add('on');
+    document.body.classList.add('reading');
+    raf = requestAnimationFrame(tick);
+  }
+  function stop(){
+    running = false; cancelAnimationFrame(raf);
+    playBtn.textContent = '▶ Scroll'; playBtn.classList.remove('on');
+    document.body.classList.remove('reading');
+  }
+  playBtn.onclick = () => running ? stop() : start();
+
+  // ---------- status & page selector ----------
+  const pageIn = $('pageIn');
+  viewer.addEventListener('scroll', () => {
+    $('progress').style.width = (scrollFrac() * 100) + '%';
+    if (!pdf) return;
+    const mid = viewer.scrollTop + viewer.clientHeight / 3;
+    let n = 1;
+    for (let i = 0; i < pageInfo.length; i++) { if (pageInfo[i].el.offsetTop <= mid) n = i + 1; else break; }
+    if (document.activeElement !== pageIn) pageIn.value = n;
+  }, { passive: true });
+
+  function scrollToY(y){
+    viewer.scrollTop = Math.max(0, y);
+    pos = viewer.scrollTop;
+  }
+  function goToPage(n){
+    if (!pdf) return;
+    n = Math.min(pdf.numPages, Math.max(1, Math.round(n) || 1));
+    pageIn.value = n;
+    scrollToY(pageInfo[n-1].el.offsetTop - 12);
+  }
+  pageIn.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { goToPage(+pageIn.value); pageIn.blur(); viewer.focus(); }
+    if (e.key === 'Escape') { pageIn.blur(); viewer.focus(); }
+  });
+  pageIn.addEventListener('change', () => goToPage(+pageIn.value));
+
+  // ---------- text search ----------
+  let textCache = null, matches = [], cur = -1, searchSeq = 0, searchedQ = '';
+  const qIn = $('q');
+
+  async function loadText(){
+    if (textCache) return textCache;
+    const out = [];
+    for (const p of pageInfo) {
+      const tc = await p.page.getTextContent();
+      let text = '';
+      const items = [];
+      for (const it of tc.items) {
+        if (!('str' in it)) continue;
+        const s = text.length;
+        text += it.str;
+        items.push({ s, e: text.length, it });
+        text += it.hasEOL ? ' ' : '';
+      }
+      out.push({ text: text.toLowerCase(), items });
+    }
+    textCache = out;
+    return out;
+  }
+
+  function showHits(){
+    const q = qIn.value.trim();
+    $('hits').textContent = !q ? '' : matches.length ? (cur + 1) + ' / ' + matches.length : 'No results';
+  }
+
+  function matchRects(m){
+    const p = pageInfo[m.page];
+    const vp = p.page.getViewport({ scale, rotation: pageRot(p) });
+    const rects = [];
+    for (const { s, e, it } of textCache[m.page].items) {
+      if (e <= m.start || s >= m.end) continue;
+      const len = (e - s) || 1;
+      const a = (Math.max(m.start, s) - s) / len, b = (Math.min(m.end, e) - s) / len;
+      const t = it.transform;
+      const h = Math.hypot(t[2], t[3]) || it.height || 10;
+      const x0 = t[4] + a * it.width, x1 = t[4] + b * it.width;
+      const r = vp.convertToViewportRectangle([x0, t[5] - h * 0.22, x1, t[5] + h * 0.85]);
+      rects.push({ left: Math.min(r[0], r[2]), top: Math.min(r[1], r[3]),
+                   width: Math.abs(r[2] - r[0]), height: Math.abs(r[3] - r[1]) });
+    }
+    return rects;
+  }
+
+  function drawHighlights(){
+    document.querySelectorAll('.hl').forEach(n => n.remove());
+    matches.forEach((m, i) => {
+      for (const r of matchRects(m)) {
+        const d = document.createElement('div');
+        d.className = i === cur ? 'hl cur' : 'hl';
+        Object.assign(d.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+        pageInfo[m.page].el.appendChild(d);
+      }
+    });
+  }
+
+  function goToMatch(i){
+    if (!matches.length) return;
+    cur = (i + matches.length) % matches.length;
+    drawHighlights();
+    showHits();
+    const m = matches[cur], r = matchRects(m)[0];
+    const y = pageInfo[m.page].el.offsetTop + (r ? r.top : 0);
+    scrollToY(y - viewer.clientHeight / 3);
+  }
+
+  async function runSearch(){
+    const seq = ++searchSeq;
+    const q = qIn.value.trim().toLowerCase();
+    searchedQ = q;
+    if (!pdf || !q) { matches = []; cur = -1; drawHighlights(); showHits(); return; }
+    $('hits').textContent = 'Searching…';
+    const pages = await loadText();
+    if (seq !== searchSeq) return;
+    matches = [];
+    pages.forEach((pg, pi) => {
+      let at = pg.text.indexOf(q);
+      while (at !== -1) { matches.push({ page: pi, start: at, end: at + q.length }); at = pg.text.indexOf(q, at + q.length); }
+    });
+    if (!matches.length) { cur = -1; drawHighlights(); showHits(); return; }
+    // start from the first match on or after the page you're on
+    const here = (+pageIn.value || 1) - 1;
+    const first = matches.findIndex(m => m.page >= here);
+    goToMatch(first === -1 ? 0 : first);
+  }
+
+  let qT;
+  qIn.addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(runSearch, 250); });
+  qIn.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(qT);
+      if (qIn.value.trim().toLowerCase() !== searchedQ) runSearch();
+      else goToMatch(cur + (e.shiftKey ? -1 : 1));
+    }
+    if (e.key === 'Escape') { qIn.value = ''; runSearch(); qIn.blur(); viewer.focus(); }
+  });
+  $('next').onclick = () => goToMatch(cur + 1);
+  $('prev').onclick = () => goToMatch(cur - 1);
+
+  // ---------- full screen & keys ----------
+  $('full').onclick = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch (e) {}
+  };
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F') && pdf) {
+      e.preventDefault(); qIn.focus(); qIn.select(); return;
+    }
+    if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key;
+    if (k === ' ') { e.preventDefault(); playBtn.click(); }
+    else if (k === 'ArrowUp' && running) { e.preventDefault(); speedIn.value = +speedIn.value + 3; speedIn.dispatchEvent(new Event('input')); }
+    else if (k === 'ArrowDown' && running) { e.preventDefault(); speedIn.value = +speedIn.value - 3; speedIn.dispatchEvent(new Event('input')); }
+    else if (k === '+' || k === '=') setZoom(scale * 1.15);
+    else if (k === '-' || k === '_') setZoom(scale / 1.15);
+    else if (k === 'f' || k === 'F') $('full').click();
+    else if (k === 'r' || k === 'R') $('rotate').click();
+  });
+})();
+</script>
+</body>
+</html>
