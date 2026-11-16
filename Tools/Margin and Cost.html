@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profit Margin Calculator</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --ink:#1d2433; --muted:#6b7385; --line:#e3e6ec;
+    --accent:#2f6fed; --auto:#eef4ff; --autoInk:#2453b8; --err:#c0392b; --good:#1f9d61;
+    --c-mat:#2f6fed; --c-lab:#f59f0b; --c-setup:#8b5cf6; --c-cost:#64748b; --c-profit:#1f9d61; --c-loss:#d64545;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.4}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 18px 60px}
+  h1{font-size:1.6rem;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 22px;font-size:.95rem}
+  .grid{display:grid;grid-template-columns:1.1fr 1fr;gap:20px}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .card h2{font-size:1.05rem;margin:0 0 14px;display:flex;justify-content:space-between;align-items:center}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:520px){.row{grid-template-columns:1fr}}
+  label{display:block;font-size:.82rem;font-weight:600;color:var(--muted);margin-bottom:5px}
+  .field{position:relative;margin-bottom:14px}
+  .field input{width:100%;padding:11px 12px;font-size:1rem;border:1.5px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);transition:.15s}
+  .field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,111,237,.15)}
+  .field input.auto{background:var(--auto);color:var(--autoInk);border-color:#cddcfb}
+  .field input[readonly]{cursor:default}
+  .field .unit{position:absolute;right:12px;top:34px;color:var(--muted);font-size:.9rem;pointer-events:none}
+  .field.has-prefix input{padding-left:26px}
+  .field .prefix{position:absolute;left:11px;top:34px;color:var(--muted);font-size:.95rem;pointer-events:none}
+  .tag{font-size:.68rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:2px 6px;border-radius:5px;margin-left:6px;vertical-align:middle}
+  .tag.auto{background:var(--auto);color:var(--autoInk)}
+  .tag.you{background:#eaf7f0;color:var(--good)}
+  .hint{font-size:.88rem;padding:10px 12px;border-radius:9px;background:#f3f5f9;color:var(--muted);margin-bottom:14px}
+  .hint.err{background:#fdecea;color:var(--err)}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+  select,button{font:inherit;font-size:.9rem;padding:8px 12px;border-radius:8px;border:1.5px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+  button:hover{border-color:#c9cfdb}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  /* ---------- Print report ---------- */
+  #printReport{display:none}
+  .pr{width:180mm;font-size:10pt;color:#111;line-height:1.35;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pr-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:6px;margin-bottom:10px}
+  .pr-head h1{font-size:16pt;margin:0}
+  .pr-head .meta{font-size:9pt;color:#555;text-align:right}
+  .pr-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}
+  .pr-kpis > div{border:1px solid #ccc;border-radius:6px;padding:6px 8px}
+  .pr-kpis .k{font-size:7.5pt;text-transform:uppercase;letter-spacing:.03em;color:#666;font-weight:600}
+  .pr-kpis .v{font-size:12.5pt;font-weight:700;font-variant-numeric:tabular-nums}
+  .pr-mid{display:flex;gap:14px;align-items:center;margin-bottom:10px}
+  .pr-mid svg{width:46mm;height:46mm;flex:none}
+  .pr-mid .legend{flex:1}
+  .pr-mid .legend div{font-size:9.5pt;padding:3px 0}
+  .pr h2{font-size:10.5pt;margin:10px 0 4px;border-bottom:1px solid #ccc;padding-bottom:2px}
+  .pr table{width:100%;border-collapse:collapse;font-size:9pt}
+  .pr th{font-size:7.5pt;text-transform:uppercase;color:#666;text-align:left;padding:3px 4px;border-bottom:1px solid #ccc}
+  .pr td{padding:3px 4px;border-bottom:1px solid #eee;font-variant-numeric:tabular-nums}
+  .pr td.n,.pr th.n{text-align:right}
+  .pr tr.sum td{font-weight:700;border-top:1px solid #999;border-bottom:none}
+  .pr .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .pr .foot{margin-top:10px;font-size:8pt;color:#666;border-top:1px solid #ccc;padding-top:5px}
+  .pr .neg{color:#c62828}
+  @media print{
+    @page{margin:12mm}
+    body{background:#fff}
+    .wrap,.toast{display:none!important}
+    #printReport{display:block!important}
+  }
+  button.danger{color:var(--err);border-color:#f0c4bf;font-weight:600}
+  button.danger:hover{background:#fdecea;border-color:var(--err)}
+  .field .clr{position:absolute;right:8px;top:30px;width:26px;height:26px;border:none;background:none;color:#a0a7b5;font-size:1.15rem;line-height:1;padding:0;border-radius:6px;display:none}
+  .field .clr:hover{color:var(--err);background:#fdecea}
+  .field.filled .clr{display:block}
+  .field input.has-clr{padding-right:36px}
+  .field .unit ~ .clr{right:28px}
+  .field .unit ~ input.has-clr, .field input.has-clr:has(~ .unit){padding-right:58px}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:.9rem;display:flex;gap:14px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .2s}
+  .toast.show{opacity:1;pointer-events:auto}
+  .toast button{background:none;border:none;color:#8fb3ff;font-weight:700;padding:0}
+  button.link{border:none;background:none;color:var(--accent);padding:4px 0;font-weight:600}
+  .switch{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-weight:600;font-size:.95rem}
+  .switch input{display:none}
+  .slider{width:40px;height:22px;background:#cfd5e0;border-radius:20px;position:relative;transition:.2s;flex:none}
+  .slider::after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .switch input:checked + .slider{background:var(--accent)}
+  .switch input:checked + .slider::after{left:20px}
+  .breakdown{display:none;margin-top:16px;border-top:1px dashed var(--line);padding-top:16px}
+  .breakdown.on{display:block}
+  .bd-sec{margin-bottom:18px}
+  .bd-sec h3{font-size:.92rem;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+  table{width:100%;border-collapse:collapse;font-size:.9rem}
+  th{text-align:left;font-size:.74rem;color:var(--muted);font-weight:600;padding:0 4px 4px}
+  td{padding:3px 4px}
+  td input{width:100%;padding:7px 8px;border:1.5px solid var(--line);border-radius:7px;font:inherit;font-size:.9rem}
+  td input:focus{outline:none;border-color:var(--accent)}
+  td.total{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--muted);width:90px}
+  td.x{width:28px;text-align:center}
+  td.x button{border:none;background:none;color:#a0a7b5;font-size:1.1rem;padding:2px 6px}
+  td.x button:hover{color:var(--err)}
+  .subtotal{display:flex;justify-content:space-between;font-size:.9rem;font-weight:600;padding:6px 4px 0}
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:18px}
+  .stat{background:#f7f8fb;border-radius:10px;padding:12px}
+  .stat .k{font-size:.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+  .stat .v{font-size:1.35rem;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px}
+  .stat.big{grid-column:span 2}
+  .neg{color:var(--c-loss)} .pos{color:var(--good)}
+  .chart-wrap{display:flex;gap:22px;align-items:center;flex-wrap:wrap;justify-content:center}
+  svg#pie{width:220px;height:220px;flex:none}
+  svg#pie path{stroke:#fff;stroke-width:2;transition:opacity .15s}
+  svg#pie path:hover{opacity:.85}
+  .legend{flex:1;min-width:190px}
+  .legend div{display:flex;align-items:center;gap:8px;font-size:.92rem;padding:5px 0;border-bottom:1px solid var(--line)}
+  .legend div:last-child{border-bottom:none}
+  .legend .lv{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:600}
+  .legend .lp{color:var(--muted);width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  .note{font-size:.85rem;color:var(--muted);margin-top:10px;text-align:center}
+  .totals{margin-top:18px;border-top:1px solid var(--line);padding-top:14px;display:none}
+  .totals.on{display:block}
+  .totals table td{padding:5px 4px;font-variant-numeric:tabular-nums}
+  .totals table td:not(:first-child){text-align:right}
+  .empty{color:var(--muted);text-align:center;padding:40px 10px;font-size:.95rem}
+  .help{font-size:.85rem;color:var(--muted);margin-top:4px}
+  .help b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Profit Margin Calculator</h1>
+  <p class="sub">Fill in any two values — the rest are calculated for you. Turn on the breakdown to build your cost from separate material and labour items.</p>
+
+  <div class="grid">
+    <!-- INPUTS -->
+    <div class="card">
+      <div class="toolbar">
+        <label class="switch"><input type="checkbox" id="bdToggle"><span class="slider"></span>Split cost into material &amp; labour</label>
+        <span style="flex:1"></span>
+        <select id="currency" title="Currency">
+          <option value="$">$ USD</option><option value="€">€ EUR</option><option value="£">£ GBP</option>
+          <option value="¥">¥ JPY</option><option value="₹">₹ INR</option><option value="C$">C$ CAD</option><option value="A$">A$ AUD</option>
+        </select>
+        <button id="printBtn" class="primary" title="Print or save a one-page PDF summary">🖨 Print / PDF</button>
+        <button id="reset" class="danger" title="Clear every field and turn off the breakdown">↺ Clear all</button>
+      </div>
+
+      <div class="field"><label for="jobName">Job / product name (optional, shown on printout)</label><input id="jobName" autocomplete="off" placeholder="e.g. Oak dining table — Smith order"></div>
+      <div id="hint" class="hint">Enter any two of: cost, selling price, profit, margin, markup.</div>
+
+      <div class="row">
+        <div class="field has-prefix"><label for="cost">Cost <span class="tag" data-for="cost"></span></label><span class="prefix cur">$</span><input id="cost" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+        <div class="field has-prefix"><label for="price">Selling price (revenue) <span class="tag" data-for="price"></span></label><span class="prefix cur">$</span><input id="price" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+      </div>
+      <div class="field has-prefix"><label for="profit">Gross profit <span class="tag" data-for="profit"></span></label><span class="prefix cur">$</span><input id="profit" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+      <div class="row">
+        <div class="field"><label for="margin">Profit margin <span class="tag" data-for="margin"></span></label><input id="margin" inputmode="decimal" autocomplete="off" placeholder="0"><span class="unit">%</span></div>
+        <div class="field"><label for="markup">Markup <span class="tag" data-for="markup"></span></label><input id="markup" inputmode="decimal" autocomplete="off" placeholder="0"><span class="unit">%</span></div>
+      </div>
+      <div class="field"><label for="qty">Units in batch / units sold (optional — used for totals and to spread setup time)</label><input id="qty" inputmode="numeric" autocomplete="off" placeholder="1"></div>
+      <p class="help"><b>Margin</b> = profit ÷ price. <b>Markup</b> = profit ÷ cost. Blue fields were auto-filled; type into any field to make it one of your two inputs.</p>
+
+      <!-- BREAKDOWN -->
+      <div class="breakdown" id="breakdown">
+        <div class="bd-sec">
+          <h3><span class="dot" style="background:var(--c-mat)"></span>Materials</h3>
+          <table><thead><tr><th>Item</th><th style="width:70px">Qty</th><th style="width:100px">Unit cost</th><th style="text-align:right">Total</th><th></th></tr></thead><tbody id="matRows"></tbody></table>
+          <button class="link" id="addMat">+ Add material</button>
+          <div class="subtotal"><span>Materials subtotal</span><span id="matSub">$0.00</span></div>
+        </div>
+        <div class="bd-sec">
+          <h3><span class="dot" style="background:var(--c-lab)"></span>Labour</h3>
+          <table><thead><tr><th>Task</th><th style="width:68px" title="Hours of work per unit">Hrs / unit</th><th style="width:68px" title="One-off setup hours for this step, spread across all units">Setup hrs</th><th style="width:90px">Rate / hr</th><th style="text-align:right" title="Cost per unit, including this step's share of setup">Per unit</th><th></th></tr></thead><tbody id="labRows"></tbody></table>
+          <button class="link" id="addLab">+ Add labour</button>
+          <div class="subtotal"><span>Labour subtotal (per unit)</span><span id="labSub">$0.00</span></div>
+          <div class="subtotal" id="setupLine" style="font-weight:400;color:var(--muted);display:none"><span id="setupLineText"></span><span id="setupLineVal"></span></div>
+        </div>
+        <p class="help">With the breakdown on, cost is the sum of materials and labour. <b>Setup hrs</b> is one-off time for a labour step (e.g. machine setup), charged at that step's rate and spread evenly across the <b>units</b> above. Enter one more value (price, profit, margin or markup) to complete the calculation.</p>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="card">
+      <h2>Results</h2>
+      <div id="results">
+        <div class="empty">Results and the chart will appear here once two values are entered.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="printReport"></div>
+
+<script>
+(() => {
+  const F = ['cost','price','profit','margin','markup'];
+  const $ = id => document.getElementById(id);
+  let order = [];           // fields the user typed, most recent last
+  let cur = '$';
+  let lastSolved = null;
+
+  const parse = s => {
+    if (s == null) return null;
+    s = String(s).replace(/[,\s%]/g,'').replace(/^[^\d\-.]+/,'');
+    if (s === '' || s === '-' || s === '.') return null;
+    const v = parseFloat(s);
+    return isFinite(v) ? v : null;
+  };
+  const money = v => {
+    if (v == null || !isFinite(v)) return '—';
+    const s = Math.abs(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    return (v < 0 ? '−' : '') + cur + s;
+  };
+  const pct = v => (v == null || !isFinite(v)) ? '—' : (v*100).toLocaleString(undefined,{maximumFractionDigits:2}) + '%';
+  const fmtField = (f, v) => {
+    if (v == null || !isFinite(v)) return '';
+    if (f === 'margin' || f === 'markup') return String(+(v*100).toFixed(2));
+    return v.toFixed(2);
+  };
+
+  // ---------- Breakdown rows ----------
+  // material row inputs: [item, qty, unit cost]
+  // labour row inputs:   [task, hrs per unit, setup hrs, rate]
+  function addRow(kind, ...vals) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = kind === 'mat'
+      ? `<td><input placeholder="e.g. Timber"></td>
+         <td><input inputmode="decimal" placeholder="1"></td>
+         <td><input inputmode="decimal" placeholder="0.00"></td>`
+      : `<td><input placeholder="e.g. Assembly"></td>
+         <td><input inputmode="decimal" placeholder="0"></td>
+         <td><input inputmode="decimal" placeholder="0"></td>
+         <td><input inputmode="decimal" placeholder="0.00"></td>`;
+    tr.innerHTML += `<td class="total">${money(0)}</td><td class="x"><button title="Remove">×</button></td>`;
+    tr.querySelectorAll('input').forEach((inp, i) => { inp.value = vals[i] ?? ''; inp.addEventListener('input', recalc); });
+    tr.querySelector('button').onclick = () => { tr.remove(); recalc(); };
+    $(kind==='mat'?'matRows':'labRows').appendChild(tr);
+  }
+  const units = () => Math.max(parse($('qty').value) || 1, 1);
+  function sumMat() {
+    let total = 0, any = false;
+    $('matRows').querySelectorAll('tr').forEach(tr => {
+      const [, q, r] = tr.querySelectorAll('input');
+      const qv = parse(q.value), rv = parse(r.value);
+      let line = 0;
+      if (rv != null) { line = (qv == null ? 1 : qv) * rv; any = true; }
+      tr.querySelector('.total').textContent = money(line);
+      total += line;
+    });
+    return { total, any };
+  }
+  // returns per-unit labour cost, split into run time and setup share
+  function sumLab() {
+    const n = units();
+    let run = 0, setup = 0, setupHrs = 0, any = false;
+    $('labRows').querySelectorAll('tr').forEach(tr => {
+      const [, h, s, r] = tr.querySelectorAll('input');
+      const hv = parse(h.value) || 0, sv = parse(s.value) || 0, rv = parse(r.value);
+      let lineRun = 0, lineSetup = 0;
+      if (rv != null) { lineRun = hv * rv; lineSetup = sv * rv / n; any = true; }
+      const cell = tr.querySelector('.total');
+      cell.textContent = money(lineRun + lineSetup);
+      cell.title = lineSetup ? `${money(lineRun)} run + ${money(lineSetup)} setup share (${sv} hrs × ${money(rv)} ÷ ${n} units)` : '';
+      run += lineRun; setup += lineSetup; setupHrs += (rv != null ? sv : 0);
+    });
+    return { total: run + setup, run, setup, setupHrs, setupTotal: setup * n, n, any };
+  }
+
+  // ---------- Solver ----------
+  function solve(k) {
+    let {cost:C, price:P, profit:G, margin:M, markup:K} = k;
+    const has = x => x != null;
+    if (has(C) && has(P)) {}
+    else if (has(C) && has(G)) P = C + G;
+    else if (has(C) && has(M)) { if (M >= 1) return {err:'Margin must be below 100% when cost is known.'}; P = C / (1 - M); }
+    else if (has(C) && has(K)) P = C * (1 + K);
+    else if (has(P) && has(G)) C = P - G;
+    else if (has(P) && has(M)) C = P * (1 - M);
+    else if (has(P) && has(K)) { if (K <= -1) return {err:'Markup must be greater than −100%.'}; C = P / (1 + K); }
+    else if (has(G) && has(M)) { if (M === 0) return {err:'Can’t work out price from profit with a 0% margin.'}; P = G / M; C = P - G; }
+    else if (has(G) && has(K)) { if (K === 0) return {err:'Can’t work out cost from profit with a 0% markup.'}; C = G / K; P = C + G; }
+    else return null;
+    G = P - C;
+    return { cost:C, price:P, profit:G, margin: P ? G / P : null, markup: C ? G / C : null };
+  }
+
+  function pickPair(bdOn) {
+    const live = order.filter(f => parse($(f).value) != null);
+    if (bdOn) {
+      const other = [...live].reverse().find(f => f !== 'cost');
+      return other ? ['cost', other] : ['cost'];
+    }
+    const rev = [...live].reverse();
+    if (!rev.length) return [];
+    const a = rev[0];
+    const b = rev.slice(1).find(f => !((a==='margin'&&f==='markup')||(a==='markup'&&f==='margin')));
+    if (b) return [a, b];
+    // only margin+markup given
+    return rev.length >= 2 ? [a, 'INVALID'] : [a];
+  }
+
+  function recalc() {
+    const bdOn = $('bdToggle').checked;
+    let mat = 0, lab = 0, L = null;
+    if (bdOn) {
+      const m = sumMat(); L = sumLab();
+      mat = m.total; lab = L.total;
+      $('matSub').textContent = money(mat);
+      $('labSub').textContent = money(lab);
+      const sl = $('setupLine');
+      if (L.setup > 0) {
+        sl.style.display = 'flex';
+        $('setupLineText').textContent = `incl. setup: ${+L.setupHrs.toFixed(2)} hrs = ${money(L.setupTotal)} ÷ ${L.n.toLocaleString()} unit${L.n===1?'':'s'}`;
+        $('setupLineVal').textContent = money(L.setup);
+      } else sl.style.display = 'none';
+      const costIn = $('cost');
+      costIn.value = (m.any || L.any) ? (mat + lab).toFixed(2) : '';
+      if (!order.includes('cost')) order.push('cost');
+    }
+
+    const pair = pickPair(bdOn);
+    const hint = $('hint');
+    hint.className = 'hint';
+    let result = null;
+
+    if (pair.includes('INVALID')) {
+      hint.classList.add('err');
+      hint.textContent = 'Margin and markup together don’t determine a price — add cost, price or profit.';
+    } else if (pair.length < 2 || (bdOn && parse($('cost').value) == null)) {
+      hint.textContent = bdOn
+        ? (parse($('cost').value) == null ? 'Add material and/or labour items to build your cost.' : 'Now enter a selling price, profit, margin or markup.')
+        : (pair.length ? 'Enter one more value to complete the calculation.' : 'Enter any two of: cost, selling price, profit, margin, markup.');
+    } else {
+      const known = {};
+      pair.forEach(f => {
+        let v = parse($(f).value);
+        if (f === 'margin' || f === 'markup') v = v / 100;
+        known[f] = v;
+      });
+      result = solve(known);
+      if (result && !result.err && L) { result.setup = L.setup; result.setupTotal = L.setupTotal; result.setupHrs = L.setupHrs; result.units = L.n; result.labRun = L.run; }
+      if (result && result.err) { hint.classList.add('err'); hint.textContent = result.err; result = null; }
+      else hint.textContent = `Calculated from ${pair.map(label).join(' and ')}.`;
+    }
+
+    // update fields & tags
+    const active = document.activeElement;
+    F.forEach(f => {
+      const inp = $(f), tag = document.querySelector(`.tag[data-for="${f}"]`);
+      const isUser = pair.includes(f) && parse(inp.value) != null;
+      if (isUser) {
+        inp.classList.remove('auto');
+        tag.className = 'tag you'; tag.textContent = (bdOn && f==='cost') ? 'from items' : 'your input';
+      } else if (result) {
+        if (inp !== active) inp.value = fmtField(f, result[f]);
+        inp.classList.add('auto');
+        tag.className = 'tag auto'; tag.textContent = 'auto';
+      } else {
+        if (inp.classList.contains('auto')) inp.value = '';
+        inp.classList.remove('auto');
+        tag.className = 'tag'; tag.textContent = '';
+      }
+    });
+    // drop fields that are no longer user inputs
+    order = order.filter(f => pair.includes(f));
+
+    $('cost').readOnly = bdOn;
+    lastSolved = result;
+    render(result, bdOn, mat, lab);
+    syncAllClear();
+    $('printBtn').disabled = !result;
+    $('printBtn').title = result ? 'Print or save a one-page PDF summary' : 'Enter two values first';
+  }
+
+  const label = f => ({cost:'cost',price:'selling price',profit:'profit',margin:'margin',markup:'markup'})[f];
+
+  // ---------- Results & pie ----------
+  function arc(cx, cy, r, a0, a1) {
+    if (a1 - a0 >= Math.PI * 2 - 1e-6) {
+      return `M${cx} ${cy-r} A${r} ${r} 0 1 1 ${cx-0.01} ${cy-r} Z`;
+    }
+    const p = a => [cx + r * Math.sin(a), cy - r * Math.cos(a)];
+    const [x0,y0] = p(a0), [x1,y1] = p(a1);
+    return `M${cx} ${cy} L${x0} ${y0} A${r} ${r} 0 ${a1-a0>Math.PI?1:0} 1 ${x1} ${y1} Z`;
+  }
+
+  function render(r, bdOn, mat, lab) {
+    const box = $('results');
+    if (!r) { box.innerHTML = '<div class="empty">Results and the chart will appear here once two values are entered.</div>'; return; }
+    const loss = r.profit < 0;
+    const qty = parse($('qty').value);
+
+    let slices, total, note = '';
+    const useBd = bdOn && (mat + lab) > 0;
+    const hasSetup = useBd && r.setup > 0;
+    const costParts = useBd
+      ? [['Material', mat, 'var(--c-mat)'],
+         ['Labour', hasSetup ? r.labRun : lab, 'var(--c-lab)'],
+         ...(hasSetup ? [['Labour setup', r.setup, 'var(--c-setup)']] : [])]
+      : [['Cost', r.cost, 'var(--c-cost)']];
+    if (!loss) {
+      total = r.price;
+      slices = [...costParts, ['Profit', r.profit, 'var(--c-profit)']];
+      note = 'Share of selling price (per unit)';
+    } else if (useBd) {
+      total = r.cost;
+      slices = costParts;
+      note = `Cost composition per unit — you're selling at a loss of ${money(-r.profit)}`;
+    } else {
+      total = r.cost;
+      slices = [['Covered by price', Math.max(r.price,0), 'var(--c-cost)'], ['Loss', -r.profit, 'var(--c-loss)']];
+      note = 'Share of total cost';
+    }
+    slices = slices.filter(s => s[1] > 0);
+
+    let pie = '';
+    if (total > 0 && slices.length) {
+      let a = 0;
+      pie = slices.map(([n, v, c]) => {
+        const a1 = a + (v / total) * Math.PI * 2;
+        const d = arc(110, 110, 100, a, a1); a = a1;
+        return `<path d="${d}" fill="${c}"><title>${n}: ${money(v)} (${pct(v/total)})</title></path>`;
+      }).join('');
+      pie += `<circle cx="110" cy="110" r="52" fill="#fff"/>
+              <text x="110" y="104" text-anchor="middle" font-size="12" fill="#6b7385">${loss ? 'Loss' : 'Margin'}</text>
+              <text x="110" y="126" text-anchor="middle" font-size="20" font-weight="700" fill="${loss?'#d64545':'#1f9d61'}">${pct(r.margin)}</text>`;
+    }
+
+    const legend = slices.map(([n, v, c]) =>
+      `<div><span class="dot" style="background:${c}"></span>${n}<span class="lv">${money(v)}</span><span class="lp">${pct(v/total)}</span></div>`).join('');
+
+    let bdStats = '';
+    if (useBd) {
+      bdStats = `<div class="stat"><div class="k">Material</div><div class="v">${money(mat)}</div><div class="help">${pct(mat/r.cost)} of cost</div></div>
+                 <div class="stat"><div class="k">Labour</div><div class="v">${money(lab)}</div><div class="help">${pct(lab/r.cost)} of cost${hasSetup ? ` · incl. ${money(r.setup)} setup` : ''}</div></div>`;
+    }
+    if (hasSetup) {
+      bdStats += `<div class="stat big"><div class="k">Labour setup</div><div class="v">${money(r.setup)} <span style="font-size:.9rem;font-weight:500;color:var(--muted)">per unit</span></div><div class="help">${+r.setupHrs.toFixed(2)} setup hrs = ${money(r.setupTotal)} total, spread over ${r.units.toLocaleString()} unit${r.units===1?'':'s'}${r.units===1 ? ' — enter units above to spread it' : ''}</div></div>`;
+    }
+
+    let totals = '';
+    if (qty != null && qty > 0 && qty !== 1) {
+      totals = `<div class="totals on"><h2 style="font-size:.95rem">Totals for ${qty.toLocaleString()} units</h2><table>
+        <tr><td>Revenue</td><td>${money(r.price*qty)}</td></tr>
+        ${useBd ? `<tr><td>Material</td><td>${money(mat*qty)}</td></tr>
+                   <tr><td>Labour${hasSetup ? ' (run time)' : ''}</td><td>${money((hasSetup ? r.labRun : lab)*qty)}</td></tr>
+                   ${hasSetup ? `<tr><td>Labour setup (one-off)</td><td>${money(r.setupTotal)}</td></tr>` : ''}` : ''}
+        <tr><td>Total cost</td><td>${money(r.cost*qty)}</td></tr>
+        <tr><td><b>Gross profit</b></td><td class="${loss?'neg':'pos'}"><b>${money(r.profit*qty)}</b></td></tr></table></div>`;
+    }
+
+    box.innerHTML = `
+      <div class="stats">
+        <div class="stat big"><div class="k">Gross profit</div><div class="v ${loss?'neg':'pos'}">${money(r.profit)}</div></div>
+        <div class="stat"><div class="k">Selling price</div><div class="v">${money(r.price)}</div></div>
+        <div class="stat"><div class="k">Cost</div><div class="v">${money(r.cost)}</div></div>
+        <div class="stat"><div class="k">Profit margin</div><div class="v ${loss?'neg':''}">${pct(r.margin)}</div></div>
+        <div class="stat"><div class="k">Markup</div><div class="v ${loss?'neg':''}">${pct(r.markup)}</div></div>
+        ${bdStats}
+      </div>
+      ${pie ? `<div class="chart-wrap"><svg id="pie" viewBox="0 0 220 220">${pie}</svg><div class="legend">${legend}</div></div><p class="note">${note}</p>` : '<p class="note">Nothing to chart yet.</p>'}
+      ${totals}`;
+  }
+
+  // ---------- Events ----------
+  F.forEach(f => {
+    $(f).addEventListener('input', () => {
+      if ($('bdToggle').checked && f === 'cost') return;
+      order = order.filter(x => x !== f);
+      if (parse($(f).value) != null) order.push(f);
+      $(f).classList.remove('auto');
+      recalc();
+    });
+    $(f).addEventListener('blur', () => { if (lastSolved && !order.includes(f)) recalc(); });
+  });
+  $('qty').addEventListener('input', recalc);
+
+  $('bdToggle').addEventListener('change', e => {
+    $('breakdown').classList.toggle('on', e.target.checked);
+    if (e.target.checked) {
+      if (!$('matRows').children.length) addRow('mat');
+      if (!$('labRows').children.length) addRow('lab');
+      // pre-fill a material line from an existing cost so nothing is lost
+      const c = parse($('cost').value);
+      const firstMat = $('matRows').querySelector('tr');
+      if (c != null && firstMat && sumMat().total === 0 && sumLab().total === 0) {
+        const ins = firstMat.querySelectorAll('input');
+        ins[0].value = 'Materials'; ins[1].value = '1'; ins[2].value = c.toFixed(2);
+      }
+    } else {
+      order = order.filter(f => f !== 'cost');
+      if (parse($('cost').value) != null) order.unshift('cost');
+    }
+    recalc();
+  });
+  $('addMat').onclick = () => { addRow('mat'); };
+  $('addLab').onclick = () => { addRow('lab'); };
+
+  $('currency').addEventListener('change', e => {
+    cur = e.target.value;
+    document.querySelectorAll('.cur').forEach(s => s.textContent = cur);
+    recalc();
+  });
+
+  // ---------- Per-field clear (×) buttons ----------
+  const CLEARABLE = F.concat('qty','jobName');
+  function syncClear(id) {
+    const inp = $(id);
+    inp.parentElement.classList.toggle('filled', inp.value !== '' && !inp.readOnly);
+  }
+  CLEARABLE.forEach(id => {
+    const inp = $(id), b = document.createElement('button');
+    b.type = 'button'; b.className = 'clr'; b.title = 'Clear this field'; b.textContent = '×';
+    b.onclick = () => { inp.value = ''; inp.dispatchEvent(new Event('input')); inp.focus(); };
+    inp.classList.add('has-clr');
+    inp.parentElement.appendChild(b);
+  });
+  function syncAllClear(){ CLEARABLE.forEach(syncClear); }
+
+  // ---------- Clear all (with undo) ----------
+  const ALL_INPUTS = CLEARABLE;
+  let undoState = null, toastTimer;
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = '<span>All fields cleared</span><button type="button">Undo</button>';
+  document.body.appendChild(toast);
+
+  function snapshot() {
+    return {
+      vals: Object.fromEntries(ALL_INPUTS.map(id => [id, $(id).value])),
+      autos: ALL_INPUTS.filter(id => $(id).classList.contains('auto')),
+      order: [...order],
+      bd: $('bdToggle').checked,
+      mat: [...$('matRows').querySelectorAll('tr')].map(tr => [...tr.querySelectorAll('input')].map(i => i.value)),
+      lab: [...$('labRows').querySelectorAll('tr')].map(tr => [...tr.querySelectorAll('input')].map(i => i.value)),
+    };
+  }
+  function clearAll() {
+    undoState = snapshot();
+    ALL_INPUTS.forEach(id => { $(id).value = ''; $(id).classList.remove('auto'); });
+    order = [];
+    $('matRows').innerHTML = ''; $('labRows').innerHTML = '';
+    $('bdToggle').checked = false; $('breakdown').classList.remove('on');
+    $('cost').readOnly = false;
+    recalc();
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 6000);
+  }
+  toast.querySelector('button').onclick = () => {
+    if (!undoState) return;
+    const s = undoState; undoState = null;
+    $('bdToggle').checked = s.bd; $('breakdown').classList.toggle('on', s.bd);
+    s.mat.forEach(v => addRow('mat', ...v));
+    s.lab.forEach(v => addRow('lab', ...v));
+    ALL_INPUTS.forEach(id => $(id).value = s.vals[id]);
+    order = s.order;
+    recalc();
+    toast.classList.remove('show');
+  };
+  $('reset').onclick = clearAll;
+  $('jobName').addEventListener('input', () => syncClear('jobName'));
+
+  // ---------- Print / PDF ----------
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+  function buildReport() {
+    const r = lastSolved; if (!r) return '';
+    const bdOn = $('bdToggle').checked;
+    const qty = parse($('qty').value);
+    const loss = r.profit < 0;
+    const job = $('jobName').value.trim();
+    const date = new Date().toLocaleDateString(undefined, {year:'numeric', month:'long', day:'numeric'});
+
+    const pieSvg = document.querySelector('#results svg#pie');
+    const legend = document.querySelector('#results .legend');
+    const note = document.querySelector('#results .note');
+
+    let html = `<div class="pr">
+      <div class="pr-head">
+        <div><h1>${esc(job || 'Profit Margin Summary')}</h1>${job ? '<div style="font-size:9pt;color:#555">Profit margin summary</div>' : ''}</div>
+        <div class="meta">${date}<br>All figures per unit${qty > 1 ? ` · batch of ${qty.toLocaleString()}` : ''}</div>
+      </div>
+      <div class="pr-kpis">
+        <div><div class="k">Selling price</div><div class="v">${money(r.price)}</div></div>
+        <div><div class="k">Total cost</div><div class="v">${money(r.cost)}</div></div>
+        <div><div class="k">Gross profit</div><div class="v ${loss?'neg':''}">${money(r.profit)}</div></div>
+        <div><div class="k">Margin</div><div class="v ${loss?'neg':''}">${pct(r.margin)}</div></div>
+        <div><div class="k">Markup</div><div class="v ${loss?'neg':''}">${pct(r.markup)}</div></div>
+      </div>`;
+
+    if (pieSvg) {
+      html += `<div class="pr-mid">${pieSvg.outerHTML.replace('id="pie"', '')}<div class="legend">${legend ? legend.innerHTML : ''}
+        ${note ? `<div style="font-size:8.5pt;color:#666;border:none;padding-top:4px">${esc(note.textContent)}</div>` : ''}</div></div>`;
+    }
+
+    if (bdOn) {
+      const matRows = [...$('matRows').querySelectorAll('tr')].map(tr => {
+        const [n, q, c] = [...tr.querySelectorAll('input')].map(i => i.value);
+        const cv = parse(c); if (cv == null) return '';
+        const qv = parse(q) ?? 1;
+        return `<tr><td>${esc(n || '—')}</td><td class="n">${qv}</td><td class="n">${money(cv)}</td><td class="n">${money(qv*cv)}</td></tr>`;
+      }).join('');
+      const n = units();
+      let labRunTot = 0, labSetTot = 0;
+      const labRows = [...$('labRows').querySelectorAll('tr')].map(tr => {
+        const [t, h, s, rt] = [...tr.querySelectorAll('input')].map(i => i.value);
+        const rv = parse(rt); if (rv == null) return '';
+        const hv = parse(h) || 0, sv = parse(s) || 0;
+        const run = hv*rv, set = sv*rv/n;
+        labRunTot += run; labSetTot += set;
+        return `<tr><td>${esc(t || '—')}</td><td class="n">${hv}</td><td class="n">${sv || '—'}</td><td class="n">${money(rv)}</td><td class="n">${money(run)}</td><td class="n">${set ? money(set) : '—'}</td><td class="n">${money(run+set)}</td></tr>`;
+      }).join('');
+      if (matRows) html += `<h2>Materials</h2><table><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Unit cost</th><th class="n">Total</th></tr></thead>
+        <tbody>${matRows}<tr class="sum"><td colspan="3">Materials per unit</td><td class="n">${$('matSub').textContent}</td></tr></tbody></table>`;
+      if (labRows) html += `<h2>Labour</h2><table><thead><tr><th>Task</th><th class="n">Hrs / unit</th><th class="n">Setup hrs</th><th class="n">Rate / hr</th><th class="n">Run cost</th><th class="n">Setup share</th><th class="n">Per unit</th></tr></thead>
+        <tbody>${labRows}<tr class="sum"><td colspan="4">Labour per unit</td><td class="n">${money(labRunTot)}</td><td class="n">${labSetTot ? money(labSetTot) : '—'}</td><td class="n">${money(labRunTot+labSetTot)}</td></tr></tbody></table>
+        ${labSetTot ? `<div style="font-size:8.5pt;color:#555;margin-top:3px">Setup: ${+(r.setupHrs||0).toFixed(2)} hrs = ${money(r.setupTotal)} total, spread evenly over ${n.toLocaleString()} unit${n===1?'':'s'}.</div>` : ''}`;
+    }
+
+    const tot = document.querySelector('#results .totals table');
+    if (tot) html += `<h2>Totals for ${qty.toLocaleString()} units</h2><table>${tot.innerHTML}</table>`;
+
+    html += `<div class="foot">${esc($('hint').textContent)} &nbsp;·&nbsp; Margin = profit ÷ selling price. Markup = profit ÷ cost.</div></div>`;
+    return html;
+  }
+
+  $('printBtn').onclick = () => {
+    if (!lastSolved) return;
+    const box = $('printReport');
+    box.innerHTML = buildReport();
+    // align totals numbers right
+    box.querySelectorAll('.pr table td:not(:first-child)').forEach(td => td.classList.add('n'));
+    // measure off-screen and shrink to fit one page if needed
+    box.style.cssText = 'display:block;position:absolute;left:-10000px;top:0;zoom:1';
+    const mm = 96 / 25.4, maxH = 245 * mm;   // safe for both A4 and US Letter with 12mm margins
+    const h = box.offsetHeight;
+    const z = h > maxH ? Math.max(maxH / h, 0.5) : 1;
+    box.style.cssText = `zoom:${z}`;
+    window.print();
+  };
+  window.addEventListener('afterprint', () => { $('printReport').style.cssText = ''; });
+
+  recalc();
+})();
+</script>
+</body>
+</html>
