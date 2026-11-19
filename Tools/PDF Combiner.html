@@ -42,6 +42,7 @@
   .meta{margin-top:7px;font-size:12px}
   .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sub{color:var(--muted);font-size:11.5px}
+  .warn{color:#b86e00;font-size:11px;margin-top:2px;cursor:help}
   .acts{display:flex;gap:4px;margin-top:6px}
   .acts button{padding:3px 7px;font-size:11.5px;border-radius:6px;flex:1}
   .acts button.x{flex:0 0 auto;color:var(--danger)}
@@ -93,7 +94,7 @@ const thumbCache = new Map();
 const $ = s => document.querySelector(s);
 const grid = $("#grid");
 
-function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2400); }
+function toast(msg, ms=2400){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),ms); }
 
 // ---------- adding files ----------
 async function addFiles(fileList){
@@ -103,8 +104,15 @@ async function addFiles(fileList){
     try{
       const bytes = new Uint8Array(await f.arrayBuffer());
       const pdfjs = await pdfjsLib.getDocument({data: bytes.slice(), ...PDFJS_OPTS}).promise;
+      // Check up front whether pdf-lib can copy this file's pages directly.
+      // If not (damaged, oddly built or encrypted), its pages get copied as images on export.
+      let lib = null, raster = false;
+      try{
+        lib = await PDFLib.PDFDocument.load(bytes, {ignoreEncryption:true, updateMetadata:false});
+        if(lib.isEncrypted || lib.getPageCount() !== pdfjs.numPages) raster = true;
+      }catch(e){ console.warn("pdf-lib could not parse", f.name, e); raster = true; }
       const id = "s"+(++uid);
-      sources.set(id, {name:f.name, bytes, pageCount:pdfjs.numPages, color:COLORS[colorIdx++ % COLORS.length], pdfjs});
+      sources.set(id, {name:f.name, bytes, pageCount:pdfjs.numPages, color:COLORS[colorIdx++ % COLORS.length], pdfjs, lib, raster});
       items.push({id:"i"+(++uid), kind:"file", src:id, rot:0});
     }catch(e){ console.error(e); toast(`Couldn't read ${f.name}`); }
   }
@@ -171,6 +179,7 @@ function render(){
       <div class="meta">
         <div class="name" title="${esc(s.name)}">${esc(s.name)}</div>
         <div class="sub">${isFile ? `${s.pageCount} page${s.pageCount>1?"s":""}` : `Page ${it.page+1} of ${s.pageCount}`}${it.rot?` · ${it.rot}°`:""}</div>
+        ${s.raster ? `<div class="warn" title="This PDF is damaged, unusually built or encrypted, so its pages will be copied into the export as high-resolution images. Text won't be selectable or searchable.">⚠ Will be copied as image</div>` : ""}
       </div>
       <div class="acts">
         ${isFile && s.pageCount>1 ? `<button data-a="explode">Explode</button>` : ""}
@@ -267,20 +276,33 @@ $("#exportBtn").onclick = async () => {
   try{
     const { PDFDocument, degrees } = PDFLib;
     const out = await PDFDocument.create();
-    const loaded = new Map();
-    const getDoc = async src => {
-      if(!loaded.has(src)) loaded.set(src, await PDFDocument.load(sources.get(src).bytes, {ignoreEncryption:true}));
-      return loaded.get(src);
-    };
+    const asImages = new Set();
+    let done = 0; const total = totalPages();
     for(const it of items){
-      const doc = await getDoc(it.src);
-      const idxs = it.kind==="file" ? doc.getPageIndices() : [it.page];
-      const pages = await out.copyPages(doc, idxs);
-      for(const p of pages){
-        if(it.rot) p.setRotation(degrees((p.getRotation().angle + it.rot) % 360));
-        out.addPage(p);
+      const s = sources.get(it.src);
+      const idxs = it.kind==="file" ? [...Array(s.pageCount).keys()] : [it.page];
+      let copied = null;
+      if(!s.raster){
+        try{
+          copied = await out.copyPages(s.lib, idxs);
+          if(copied.some(p => !p)) copied = null;
+        }catch(e){ console.warn("Direct copy failed, using image copy:", s.name, e); copied = null; }
+      }
+      if(copied){
+        for(const p of copied){
+          if(it.rot) p.setRotation(degrees((p.getRotation().angle + it.rot) % 360));
+          out.addPage(p);
+          btn.textContent = `Building… ${++done}/${total}`;
+        }
+      }else{
+        asImages.add(s.name);
+        for(const i of idxs){
+          await addPageAsImage(out, s, i, it.rot, degrees);
+          btn.textContent = `Building… ${++done}/${total}`;
+        }
       }
     }
+    btn.textContent = "Saving…";
     const bytes = await out.save();
     let name = ($("#outName").value.trim() || "combined.pdf");
     if(!/\.pdf$/i.test(name)) name += ".pdf";
@@ -288,10 +310,30 @@ $("#exportBtn").onclick = async () => {
     const a = document.createElement("a"); a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url), 10000);
-    toast(`Saved ${name} (${out.getPageCount()} pages)`);
-  }catch(e){ console.error(e); toast("Export failed: " + (e.message||e)); }
+    toast(`Saved ${name} (${out.getPageCount()} pages)` +
+      (asImages.size ? ` — ${[...asImages].join(", ")} copied as images` : ""), asImages.size ? 6000 : 2400);
+  }catch(e){ console.error(e); toast("Export failed: " + (e.message||e), 6000); }
   btn.disabled = !items.length; btn.textContent = "Export PDF";
 };
+
+// Fallback: render the page with pdf.js at ~200 dpi and place it on a page the same size.
+async function addPageAsImage(out, s, i, rot, degrees){
+  const pg = await s.pdfjs.getPage(i+1);
+  const vp1 = pg.getViewport({scale:1});          // size in points, already honoring the page's own rotation
+  const scale = Math.min(200/72, 6000/Math.max(vp1.width, vp1.height));
+  const vp = pg.getViewport({scale});
+  const c = document.createElement("canvas");
+  c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0,0,c.width,c.height);
+  await pg.render({canvas:c, canvasContext:ctx, viewport:vp}).promise;
+  const jpg = await new Promise(r => c.toBlob(b => b.arrayBuffer().then(r), "image/jpeg", 0.9));
+  c.width = c.height = 0;
+  const img = await out.embedJpg(jpg);
+  const page = out.addPage([vp1.width, vp1.height]);
+  page.drawImage(img, {x:0, y:0, width:vp1.width, height:vp1.height});
+  if(rot) page.setRotation(degrees(rot));
+}
 
 render();
 </script>
