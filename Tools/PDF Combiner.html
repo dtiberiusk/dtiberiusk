@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Combiner</title>
+<script src="lib/pdf-lib.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f2ee; --panel:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e2dfd8;
+    --accent:#2f5bea; --accent-ink:#fff; --danger:#c8372d;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#17171a; --panel:#222226; --ink:#ececf0; --muted:#9a9aa2; --line:#34343a; --accent:#6f8cff; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+  header{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+  h1{font-size:17px;margin:0 12px 0 0;font-weight:650;letter-spacing:-.01em}
+  .stats{color:var(--muted);font-size:13px;margin-right:auto}
+  button,.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}
+  button:hover,.btn:hover{border-color:var(--muted)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+  button:disabled{opacity:.45;cursor:default}
+  input[type=text]{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:200px}
+  main{padding:20px}
+  #drop{border:2px dashed var(--line);border-radius:14px;padding:28px;text-align:center;color:var(--muted);transition:.15s;margin-bottom:20px;cursor:pointer}
+  #drop.hot,body.filedrag #drop{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent)}
+  #drop strong{color:var(--ink)}
+  #grid{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;min-height:60px}
+  .card{position:relative;width:150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;cursor:grab;user-select:none;transition:transform .12s, box-shadow .12s}
+  .card:hover{box-shadow:0 4px 14px rgba(0,0,0,.08)}
+  .card.dragging{opacity:.35}
+  .card .bar{position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:0 3px 3px 0}
+  .card .num{position:absolute;top:-9px;left:-9px;background:var(--ink);color:var(--bg);font-size:11px;font-weight:700;min-width:22px;height:22px;border-radius:11px;display:grid;place-items:center;padding:0 5px}
+  .thumb{height:170px;display:grid;place-items:center;background:var(--bg);border-radius:6px;overflow:hidden;position:relative}
+  .thumb img{max-width:100%;max-height:100%;box-shadow:0 1px 4px rgba(0,0,0,.25);background:#fff}
+  .card.file .thumb::before,.card.file .thumb::after{content:"";position:absolute;inset:14px 10px 6px 18px;background:#fff;border:1px solid #ccc;border-radius:2px;transform:rotate(4deg);opacity:.7}
+  .card.file .thumb::after{transform:rotate(-3deg);opacity:.5}
+  .card.file.single .thumb::before,.card.file.single .thumb::after{display:none}
+  .thumb img{position:relative;z-index:1}
+  .meta{margin-top:7px;font-size:12px}
+  .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub{color:var(--muted);font-size:11.5px}
+  .acts{display:flex;gap:4px;margin-top:6px}
+  .acts button{padding:3px 7px;font-size:11.5px;border-radius:6px;flex:1}
+  .acts button.x{flex:0 0 auto;color:var(--danger)}
+  .card.page{width:120px}
+  .card.page .thumb{height:135px}
+  .rot img{transition:transform .15s}
+  .marker{position:absolute;top:0;bottom:0;width:4px;background:var(--accent);border-radius:2px;pointer-events:none}
+  .marker.l{left:-11px}.marker.r{right:-11px}
+  .empty{color:var(--muted);padding:30px 0;text-align:center;width:100%}
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.2s;pointer-events:none}
+  #toast.show{opacity:1}
+  .hint{color:var(--muted);font-size:12.5px;margin:-8px 0 16px}
+</style>
+</head>
+<body>
+<header>
+  <h1>PDF Combiner</h1>
+  <span class="stats" id="stats">No files yet</span>
+  <button id="addBtn">+ Add PDFs</button>
+  <button id="explodeAll">Explode all</button>
+  <button id="rejoinAll">Rejoin all</button>
+  <button id="clearBtn">Clear</button>
+  <input type="text" id="outName" value="combined.pdf" aria-label="Output file name">
+  <button class="primary" id="exportBtn" disabled>Export PDF</button>
+</header>
+<main>
+  <div id="drop"><strong>Drop PDFs here</strong> or click to choose — you can drop more anywhere on the page.</div>
+  <p class="hint">Drag cards to set the order (front → back). <b>Explode</b> splits a PDF into pages you can reorder individually; <b>Rejoin</b> puts them back together. ⟳ rotates a page.</p>
+  <div id="grid"></div>
+</main>
+<input type="file" id="fileInput" accept="application/pdf,.pdf" multiple hidden>
+<div id="toast"></div>
+
+<script type="module">
+import * as pdfjsLib from "./lib/pdfjs/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("./lib/pdfjs/pdf.worker.min.mjs", import.meta.url).href;
+const PDFJS_OPTS = {
+  standardFontDataUrl: new URL("./lib/pdfjs/standard_fonts/", import.meta.url).href,
+  wasmUrl: new URL("./lib/pdfjs/wasm/", import.meta.url).href,
+  iccUrl: new URL("./lib/pdfjs/iccs/", import.meta.url).href,
+};
+
+const COLORS = ["#e2553f","#2f9e6e","#3a6ff0","#d99a1e","#9b51e0","#16a3b8","#d6457f","#6d8a1f","#8a5a3c","#4b5bb5"];
+const sources = new Map();   // srcId -> {name, bytes, pageCount, color, pdfjs}
+let items = [];              // {id, kind:'file'|'page', src, page?, rot}
+let uid = 0, colorIdx = 0, dragId = null;
+const thumbCache = new Map();
+
+const $ = s => document.querySelector(s);
+const grid = $("#grid");
+
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2400); }
+
+// ---------- adding files ----------
+async function addFiles(fileList){
+  const files = [...fileList].filter(f => f.type==="application/pdf" || /\.pdf$/i.test(f.name));
+  if(!files.length){ toast("Only PDF files can be added"); return; }
+  for(const f of files){
+    try{
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      const pdfjs = await pdfjsLib.getDocument({data: bytes.slice(), ...PDFJS_OPTS}).promise;
+      const id = "s"+(++uid);
+      sources.set(id, {name:f.name, bytes, pageCount:pdfjs.numPages, color:COLORS[colorIdx++ % COLORS.length], pdfjs});
+      items.push({id:"i"+(++uid), kind:"file", src:id, rot:0});
+    }catch(e){ console.error(e); toast(`Couldn't read ${f.name}`); }
+  }
+  render();
+}
+
+// ---------- thumbnails ----------
+async function thumb(src, page){
+  const key = src+":"+page;
+  if(thumbCache.has(key)) return thumbCache.get(key);
+  const p = (async () => {
+    const s = sources.get(src);
+    const pg = await s.pdfjs.getPage(page+1);
+    const vp0 = pg.getViewport({scale:1});
+    const scale = 260 / Math.max(vp0.width, vp0.height);
+    const vp = pg.getViewport({scale});
+    const c = document.createElement("canvas");
+    c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+    await pg.render({canvas:c, canvasContext:c.getContext("2d"), viewport:vp}).promise;
+    return c.toDataURL("image/jpeg", .8);
+  })();
+  thumbCache.set(key, p);
+  return p;
+}
+
+// ---------- actions ----------
+function explode(itemId){
+  const i = items.findIndex(x=>x.id===itemId); if(i<0) return;
+  const it = items[i], s = sources.get(it.src);
+  const pages = Array.from({length:s.pageCount}, (_,p)=>({id:"i"+(++uid), kind:"page", src:it.src, page:p, rot:it.rot}));
+  items.splice(i,1,...pages);
+  render();
+}
+function rejoin(src){
+  const first = items.findIndex(x=>x.src===src && x.kind==="page"); if(first<0) return;
+  const kept = items.filter(x=>x.src===src && x.kind==="page").length;
+  const s = sources.get(src);
+  items = items.filter((x,idx)=> idx===first || !(x.src===src && x.kind==="page"));
+  items[first] = {id:"i"+(++uid), kind:"file", src, rot:0};
+  if(kept < s.pageCount) toast(`Rejoined — removed pages restored (${s.pageCount} pages)`);
+  render();
+}
+function removeItem(id){ items = items.filter(x=>x.id!==id); cleanup(); render(); }
+function rotate(id){ const it=items.find(x=>x.id===id); it.rot=(it.rot+90)%360; render(); }
+function cleanup(){ for(const k of [...sources.keys()]) if(!items.some(x=>x.src===k)){ sources.get(k).pdfjs.destroy(); sources.delete(k); } }
+
+// ---------- render ----------
+function totalPages(){ return items.reduce((n,x)=>n+(x.kind==="file"?sources.get(x.src).pageCount:1),0); }
+
+function render(){
+  grid.innerHTML = "";
+  if(!items.length) grid.innerHTML = '<div class="empty">Your PDFs will appear here.</div>';
+  items.forEach((it, idx) => {
+    const s = sources.get(it.src);
+    const el = document.createElement("div");
+    el.className = "card " + it.kind + (it.kind==="file" && s.pageCount===1 ? " single":"");
+    el.draggable = true; el.dataset.id = it.id;
+    const isFile = it.kind==="file";
+    const hasPages = items.some(x=>x.src===it.src && x.kind==="page");
+    el.innerHTML = `
+      <div class="bar" style="background:${s.color}"></div>
+      <div class="num">${idx+1}</div>
+      <div class="thumb rot"><img alt=""></div>
+      <div class="meta">
+        <div class="name" title="${esc(s.name)}">${esc(s.name)}</div>
+        <div class="sub">${isFile ? `${s.pageCount} page${s.pageCount>1?"s":""}` : `Page ${it.page+1} of ${s.pageCount}`}${it.rot?` · ${it.rot}°`:""}</div>
+      </div>
+      <div class="acts">
+        ${isFile && s.pageCount>1 ? `<button data-a="explode">Explode</button>` : ""}
+        ${!isFile && hasPages ? `<button data-a="rejoin" title="Put all pages of this PDF back together">Rejoin</button>` : ""}
+        <button data-a="rotate" title="Rotate 90°">⟳</button>
+        <button data-a="remove" class="x" title="Remove">✕</button>
+      </div>`;
+    const img = el.querySelector("img");
+    img.style.transform = `rotate(${it.rot}deg)`;
+    thumb(it.src, isFile ? 0 : it.page).then(u=>img.src=u).catch(()=>{});
+    el.querySelector(".acts").addEventListener("click", e=>{
+      const a = e.target.dataset.a; if(!a) return;
+      if(a==="explode") explode(it.id);
+      if(a==="rejoin") rejoin(it.src);
+      if(a==="rotate") rotate(it.id);
+      if(a==="remove") removeItem(it.id);
+    });
+    grid.appendChild(el);
+  });
+  const nf = sources.size, np = totalPages();
+  $("#stats").textContent = nf ? `${nf} file${nf>1?"s":""} · ${np} page${np!==1?"s":""} in output` : "No files yet";
+  $("#exportBtn").disabled = !items.length;
+}
+const esc = s => s.replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// ---------- drag to reorder ----------
+let marker = null, dropTarget = null;
+function clearMarker(){ marker?.remove(); marker=null; dropTarget=null; }
+
+grid.addEventListener("dragstart", e=>{
+  const c = e.target.closest(".card"); if(!c) return;
+  dragId = c.dataset.id; c.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", dragId);
+});
+grid.addEventListener("dragend", e=>{
+  e.target.closest?.(".card")?.classList.remove("dragging");
+  dragId = null; clearMarker();
+});
+grid.addEventListener("dragover", e=>{
+  if(!dragId) return;
+  e.preventDefault();
+  const c = e.target.closest(".card");
+  if(!c){ // over empty grid space: drop at nearest end
+    const cards=[...grid.querySelectorAll(".card")]; const last=cards[cards.length-1];
+    if(!last) return;
+    setMarker(last, "r"); return;
+  }
+  const r = c.getBoundingClientRect();
+  setMarker(c, e.clientX < r.left + r.width/2 ? "l" : "r");
+});
+function setMarker(card, side){
+  if(dropTarget && dropTarget.card===card && dropTarget.side===side) return;
+  clearMarker();
+  marker = document.createElement("div"); marker.className = "marker "+side;
+  card.appendChild(marker); dropTarget = {card, side};
+}
+grid.addEventListener("drop", e=>{
+  if(!dragId) return;
+  e.preventDefault(); e.stopPropagation();
+  if(!dropTarget){ clearMarker(); return; }
+  const tId = dropTarget.card.dataset.id, side = dropTarget.side;
+  clearMarker();
+  if(tId === dragId) return;
+  const from = items.findIndex(x=>x.id===dragId);
+  const [moved] = items.splice(from,1);
+  let to = items.findIndex(x=>x.id===tId) + (side==="r"?1:0);
+  items.splice(to,0,moved);
+  render();
+});
+
+// ---------- file drop anywhere ----------
+let depth = 0;
+const isFileDrag = e => [...(e.dataTransfer?.types||[])].includes("Files");
+window.addEventListener("dragenter", e=>{ if(isFileDrag(e)){ depth++; document.body.classList.add("filedrag"); }});
+window.addEventListener("dragleave", e=>{ if(isFileDrag(e) && --depth<=0){ depth=0; document.body.classList.remove("filedrag"); }});
+window.addEventListener("dragover", e=>{ if(isFileDrag(e)) e.preventDefault(); });
+window.addEventListener("drop", e=>{
+  if(!isFileDrag(e)) return;
+  e.preventDefault(); depth=0; document.body.classList.remove("filedrag");
+  addFiles(e.dataTransfer.files);
+});
+$("#drop").onclick = $("#addBtn").onclick = () => $("#fileInput").click();
+$("#fileInput").onchange = e => { addFiles(e.target.files); e.target.value=""; };
+
+// ---------- toolbar ----------
+$("#explodeAll").onclick = () => { items.filter(x=>x.kind==="file" && sources.get(x.src).pageCount>1).map(x=>x.id).forEach(explode); };
+$("#rejoinAll").onclick = () => { [...new Set(items.filter(x=>x.kind==="page").map(x=>x.src))].forEach(rejoin); };
+$("#clearBtn").onclick = () => { items=[]; cleanup(); thumbCache.clear(); render(); };
+
+// ---------- export ----------
+$("#exportBtn").onclick = async () => {
+  const btn = $("#exportBtn"); btn.disabled = true; btn.textContent = "Building…";
+  try{
+    const { PDFDocument, degrees } = PDFLib;
+    const out = await PDFDocument.create();
+    const loaded = new Map();
+    const getDoc = async src => {
+      if(!loaded.has(src)) loaded.set(src, await PDFDocument.load(sources.get(src).bytes, {ignoreEncryption:true}));
+      return loaded.get(src);
+    };
+    for(const it of items){
+      const doc = await getDoc(it.src);
+      const idxs = it.kind==="file" ? doc.getPageIndices() : [it.page];
+      const pages = await out.copyPages(doc, idxs);
+      for(const p of pages){
+        if(it.rot) p.setRotation(degrees((p.getRotation().angle + it.rot) % 360));
+        out.addPage(p);
+      }
+    }
+    const bytes = await out.save();
+    let name = ($("#outName").value.trim() || "combined.pdf");
+    if(!/\.pdf$/i.test(name)) name += ".pdf";
+    const url = URL.createObjectURL(new Blob([bytes], {type:"application/pdf"}));
+    const a = document.createElement("a"); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 10000);
+    toast(`Saved ${name} (${out.getPageCount()} pages)`);
+  }catch(e){ console.error(e); toast("Export failed: " + (e.message||e)); }
+  btn.disabled = !items.length; btn.textContent = "Export PDF";
+};
+
+render();
+</script>
+</body>
+</html>
