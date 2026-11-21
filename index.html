@@ -7,6 +7,38 @@
   <link rel="stylesheet" href="style.css">
 </head>
 
+ <script>
+  (function () {
+    const gallery = document.querySelector('.gallery');
+    if (!gallery) return;
+    const imgs = [...gallery.querySelectorAll('img')];
+
+    function layout() {
+      const ready = imgs.filter(i => i.naturalWidth);
+      if (!ready.length) return;
+      const border = parseFloat(getComputedStyle(ready[0]).borderLeftWidth) * 2;
+      const gap = parseFloat(getComputedStyle(gallery).columnGap) || 0;
+      const totalRatio = ready.reduce((s, i) => s + i.naturalWidth / i.naturalHeight, 0);
+
+      const availW = gallery.clientWidth - gap * (ready.length - 1) - border * ready.length;
+      const footer = document.querySelector('footer');
+      const top = gallery.getBoundingClientRect().top;
+      const bottom = footer ? footer.getBoundingClientRect().top : window.innerHeight;
+      const availH = bottom - top - gap - border;
+
+      const h = Math.max(50, Math.min(availW / totalRatio, availH));
+      ready.forEach(i => {
+        i.style.height = (h + border) + 'px';
+        i.style.width = (h * i.naturalWidth / i.naturalHeight + border) + 'px';
+      });
+    }
+
+    imgs.forEach(i => { if (!i.complete) i.addEventListener('load', layout); });
+    window.addEventListener('resize', layout);
+    layout();
+  })();
+  </script>
+
 <body>
   <header>
     <img src="Images/haroldscousin.jpeg" alt="Mr Harold's Cousin" class="top-image">

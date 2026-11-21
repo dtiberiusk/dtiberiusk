@@ -190,16 +190,15 @@ footer a:hover {
   display: flex;
   gap: 1.5rem;
   margin-top: 2rem;
+  justify-content: center;
 }
 
 .gallery img {
-  flex: 1 1 0;
-  min-width: 0;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  border: 0.4rem solid #1a2a5e;
+  flex: none;
   display: block;
-  max-height: 40vh;
+  height: 12rem;
+  width: auto;
+  border: 0.4rem solid #1a2a5e;
   transition: transform 0.2s ease;
 }
 
