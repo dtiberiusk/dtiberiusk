@@ -9,19 +9,16 @@
 
 <body>
   <header>
-    <img src="Images/haroldscousin.jpeg" alt="Mr Harold's Cousin" class="top-image">
+    <img src="/art/haroldscousin.jpeg" alt="Mr Harold's Cousin" class="top-image">
     <div class="titles">
       <h1>Hello world!</h1>
       <h2>So far just some tools and some art.</h2>
-    </div>    
+    </div>
   </header>
-  
-  <main class="gallery">
-    <img src="Images/sphere.jpg" alt="Alien Sphere">
-    <img src="Images/ship.jpg" alt="Watercolor Ship">
-  </main>
 
-  <footer>                                  
+  <main class="gallery"></main>
+
+  <footer>
     <a href="Tools/Electrical%20Calculations.html">Electrical Calculations</a>
     <a href="Tools/Margin%20and%20Cost.html">Revenue and Margin Calculator</a>
     <a href="Tools/PDF%20Scroll%20Reader.html">PDF Scroller</a>
@@ -34,7 +31,7 @@
   (function () {
     const gallery = document.querySelector('.gallery');
     if (!gallery) return;
-    const imgs = [...gallery.querySelectorAll('img')];
+    let imgs = [];
 
     function layout() {
       const ready = imgs.filter(i => i.naturalWidth);
@@ -42,13 +39,11 @@
       const border = parseFloat(getComputedStyle(ready[0]).borderLeftWidth) * 2;
       const gap = parseFloat(getComputedStyle(gallery).columnGap) || 0;
       const totalRatio = ready.reduce((s, i) => s + i.naturalWidth / i.naturalHeight, 0);
-
       const availW = gallery.clientWidth - gap * (ready.length - 1) - border * ready.length;
       const footer = document.querySelector('footer');
       const top = gallery.getBoundingClientRect().top;
       const bottom = footer ? footer.getBoundingClientRect().top : window.innerHeight;
       const availH = bottom - top - gap - border;
-
       const h = Math.max(50, Math.min(availW / totalRatio, availH));
       ready.forEach(i => {
         i.style.height = (h + border) + 'px';
@@ -56,11 +51,25 @@
       });
     }
 
-    imgs.forEach(i => { if (!i.complete) i.addEventListener('load', layout); });
+    fetch('/art/')
+      .then(r => r.json())
+      .then(files => {
+        files
+          .filter(f => f.type === 'file' && /\.(jpe?g|png|webp|gif)$/i.test(f.name))
+          .filter(f => f.name !== 'haroldscousin.jpeg')
+          .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+          .forEach(f => {
+            const img = document.createElement('img');
+            img.src = '/art/' + encodeURIComponent(f.name);
+            img.alt = f.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
+            img.addEventListener('load', layout);
+            gallery.appendChild(img);
+            imgs.push(img);
+          });
+      });
+
     window.addEventListener('resize', layout);
-    layout();
   })();
   </script>
-
 </body>
 </html>
