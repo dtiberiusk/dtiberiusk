@@ -5,21 +5,413 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Music · dtiberiusk</title>
   <link rel="stylesheet" href="../style.css">
+  <style>
+    /* ---------- Music player layout (works inside the site's navy frame) ---------- */
+    body.player {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1.5rem;
+    }
+
+    .player-head {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .player-head h1 { margin: 0; }
+    .player-head .count { font-size: 0.8rem; opacity: 0.75; }
+    .player-head .spacer { flex: 1; }
+    .player-head a {
+      color: #1a2a5e; font-weight: 600; text-decoration: none;
+      display: inline-block; transition: transform 0.2s ease;
+    }
+    .player-head a:hover { text-decoration: underline; transform: scale(1.1); }
+
+    #search {
+      font: inherit; font-size: 0.9rem; color: #1a2a5e;
+      background: #f7f4e8; border: 0.15rem solid #1a2a5e;
+      padding: 0.4rem 0.6rem; width: 16rem; max-width: 100%;
+    }
+
+    .library {
+      flex: 1;
+      min-height: 0;               /* lets the two columns scroll inside the frame */
+      display: grid;
+      grid-template-columns: 14rem 1fr;
+      gap: 1rem;
+    }
+
+    .artists, .tracks {
+      overflow-y: auto;
+      border: 0.15rem solid #1a2a5e;
+      background: #f7f4e8;
+    }
+
+    .artists button {
+      display: block; width: 100%; text-align: left;
+      font: inherit; font-size: 0.9rem; color: #1a2a5e;
+      background: none; border: 0; border-bottom: 1px solid #d9d3b8;
+      padding: 0.55rem 0.75rem; cursor: pointer;
+    }
+    .artists button:hover { background: #ede8d0; }
+    .artists button.active { background: #1a2a5e; color: #EDE8D0; font-weight: 600; }
+
+    .tracks { padding: 0.75rem 1rem; }
+    .tracks h3 {
+      font-size: 0.95rem; margin: 1rem 0 0.4rem;
+      display: flex; align-items: center; gap: 0.6rem;
+    }
+    .tracks h3:first-child { margin-top: 0; }
+    .tracks h3 img { width: 2.5rem; height: 2.5rem; object-fit: cover; border: 0.15rem solid #1a2a5e; }
+    .tracks h3 .play-all {
+      margin-left: auto; font: inherit; font-size: 0.75rem; font-weight: 600;
+      color: #EDE8D0; background: #1a2a5e; border: 0; padding: 0.25rem 0.6rem; cursor: pointer;
+    }
+
+    .track {
+      display: flex; gap: 0.6rem; align-items: baseline; width: 100%;
+      font: inherit; font-size: 0.9rem; color: #1a2a5e; text-align: left;
+      background: none; border: 0; padding: 0.35rem 0.4rem; cursor: pointer;
+    }
+    .track:hover { background: #ede8d0; }
+    .track .num { width: 1.5rem; opacity: 0.6; font-size: 0.8rem; flex: none; }
+    .track .sub { opacity: 0.65; font-size: 0.8rem; margin-left: auto; text-align: right; }
+    .track.playing { font-weight: 700; }
+    .track.playing .num { opacity: 1; }
+
+    .message { padding: 1rem; font-size: 0.9rem; opacity: 0.8; }
+
+    /* ---------- Now-playing bar ---------- */
+    .bar {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 1rem;
+      border-top: 0.15rem solid #1a2a5e;
+      padding-top: 0.75rem;
+    }
+    .controls { display: flex; gap: 0.4rem; align-items: center; }
+    .controls button {
+      font: inherit; font-size: 1rem; line-height: 1;
+      width: 2.4rem; height: 2.4rem;
+      color: #EDE8D0; background: #1a2a5e; border: 0; cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .controls button:hover { transform: scale(1.1); }
+    .controls button:disabled { opacity: 0.4; cursor: default; transform: none; }
+    .controls #playBtn { width: 2.9rem; height: 2.9rem; font-size: 1.2rem; }
+    .controls #shuffleBtn { background: none; color: #1a2a5e; border: 0.15rem solid #1a2a5e; font-size: 0.85rem; }
+    .controls #shuffleBtn.on { background: #1a2a5e; color: #EDE8D0; }
+
+    .now { min-width: 0; }
+    .now .title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .now .artist { font-size: 0.8rem; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .seek { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; margin-top: 0.3rem; }
+    .seek input { flex: 1; accent-color: #1a2a5e; }
+    .volume { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; }
+    .volume input { width: 6rem; accent-color: #1a2a5e; }
+
+    /* ---------- Phones ---------- */
+    @media (max-width: 700px) {
+      body.player { padding: 1rem; }
+      #search { width: 100%; order: 5; }
+      .library { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      .artists { display: flex; overflow-x: auto; overflow-y: hidden; }
+      .artists button { width: auto; white-space: nowrap; border-bottom: 0; border-right: 1px solid #d9d3b8; }
+      .bar { grid-template-columns: 1fr; gap: 0.5rem; }
+      .volume { display: none; }        /* phones use their own volume buttons */
+    }
+  </style>
 </head>
 
-<body>
-  <header>
-    <div class="titles">
-      <h1>Music</h1>
-      <h2>Player coming soon.</h2>
-    </div>
-  </header>
-
-  <main>
-  </main>
-
-  <footer>
+<body class="player">
+  <div class="player-head">
+    <h1>Music</h1>
+    <span class="count" id="count">Loading library…</span>
+    <span class="spacer"></span>
+    <input id="search" type="search" placeholder="Search songs, artists, albums" autocomplete="off">
     <a href="../index.html">Home</a>
-  </footer>
+  </div>
+
+  <div class="library">
+    <nav class="artists" id="artists" aria-label="Artists"></nav>
+    <section class="tracks" id="tracks"><div class="message">Loading…</div></section>
+  </div>
+
+  <div class="bar">
+    <div class="controls">
+      <button id="prevBtn" title="Previous" disabled>⏮</button>
+      <button id="playBtn" title="Play" disabled>▶</button>
+      <button id="nextBtn" title="Next" disabled>⏭</button>
+      <button id="shuffleBtn" title="Shuffle">⤮</button>
+    </div>
+    <div class="now">
+      <div class="title" id="nowTitle">Nothing playing</div>
+      <div class="artist" id="nowArtist">Pick a song to start</div>
+      <div class="seek">
+        <span id="curTime">0:00</span>
+        <input id="seek" type="range" min="0" max="0" step="0.1" value="0" aria-label="Seek">
+        <span id="durTime">0:00</span>
+      </div>
+    </div>
+    <div class="volume">
+      <span>Vol</span>
+      <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volume">
+    </div>
+  </div>
+
+  <audio id="audio" preload="metadata"></audio>
+
+  <script>
+  (function () {
+    // Where Caddy serves the music folder (behind the same password as this page).
+    const BASE = '/music/files/';
+    const AUDIO = /\.(mp3|m4a|aac|flac|ogg|oga|opus|wav)$/i;
+    const COVER = /^(cover|folder|front|album)\.(jpe?g|png|webp)$/i;
+
+    const $ = id => document.getElementById(id);
+    const audio = $('audio');
+    const store = {
+      get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+      set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+    };
+
+    let tracks = [];          // every song in the library
+    let covers = {};          // "Artist/Album" -> cover image URL
+    let queue = [], qi = -1;  // what plays next, and where we are in it
+    let shuffle = store.get('music-shuffle') === '1';
+    let currentArtist = null;
+
+    // ---------- helpers ----------
+    const urlFor = parts => BASE + parts.map(encodeURIComponent).join('/');
+    // "01 Intro.mp3" / "01 - Intro.mp3" -> "Intro" (the list already shows track numbers)
+    const titleOf = name => name.replace(/\.[^.]+$/, '').replace(/^(0\d|\d{1,3}\s*[-._])\s*/, '') || name;
+    const fmt = s => {
+      if (!isFinite(s)) return '0:00';
+      s = Math.floor(s);
+      return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    };
+    const byName = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    function el(tag, cls, text) {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text != null) e.textContent = text;
+      return e;
+    }
+
+    // ---------- read the library from Caddy's folder listings ----------
+    async function list(parts) {
+      const r = await fetch(urlFor(parts) + (parts.length ? '/' : ''), { headers: { Accept: 'application/json' } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const items = await r.json();
+      return items.map(f => ({ name: f.name.replace(/\/$/, ''), dir: f.is_dir === true || f.type === 'directory' }));
+    }
+
+    async function scan(parts) {
+      const items = await list(parts);
+      await Promise.all(items.map(async it => {
+        const p = parts.concat(it.name);
+        if (it.dir) return scan(p);
+        if (parts.length >= 2 && COVER.test(it.name)) covers[parts.join('/')] = urlFor(p);
+        if (parts.length >= 1 && AUDIO.test(it.name)) {
+          tracks.push({
+            title: titleOf(it.name),
+            artist: parts[0],
+            album: parts.length > 1 ? parts.slice(1).join(' / ') : null,
+            albumKey: parts.join('/'),
+            url: urlFor(p)
+          });
+        }
+      }));
+    }
+
+    // ---------- drawing the lists ----------
+    function trackButton(t, i, list, showWhere) {
+      const b = el('button', 'track');
+      const num = el('span', 'num', String(i + 1));
+      num.dataset.n = String(i + 1);
+      b.append(num, el('span', '', t.title));
+      if (showWhere) b.append(el('span', 'sub', t.artist + (t.album ? ' · ' + t.album : '')));
+      b.dataset.url = t.url;
+      b.onclick = () => playFrom(list, i);
+      return b;
+    }
+
+    function group(title, list, cover) {
+      const frag = document.createDocumentFragment();
+      const h = el('h3');
+      if (cover) { const img = el('img'); img.src = cover; img.alt = ''; h.append(img); }
+      h.append(el('span', '', title));
+      const all = el('button', 'play-all', '▶ Play');
+      all.onclick = () => playFrom(list, 0);
+      h.append(all);
+      frag.append(h);
+      list.forEach((t, i) => frag.append(trackButton(t, i, list, false)));
+      return frag;
+    }
+
+    function showArtist(name) {
+      currentArtist = name;
+      $('search').value = '';
+      document.querySelectorAll('.artists button').forEach(b => b.classList.toggle('active', b.dataset.name === name));
+      const box = $('tracks');
+      box.replaceChildren();
+      const mine = tracks.filter(t => t.artist === name);
+      const albums = [...new Set(mine.filter(t => t.album).map(t => t.albumKey))].sort(byName);
+      albums.forEach(key => {
+        const list = mine.filter(t => t.albumKey === key);
+        box.append(group(list[0].album, list, covers[key]));
+      });
+      const singles = mine.filter(t => !t.album);
+      if (singles.length) box.append(group(albums.length ? 'Songs' : name, singles));
+      box.scrollTop = 0;
+      markPlaying();
+    }
+
+    function showSearch(q) {
+      const box = $('tracks');
+      if (!q) { if (currentArtist) showArtist(currentArtist); return; }
+      document.querySelectorAll('.artists button').forEach(b => b.classList.remove('active'));
+      const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+      const hits = tracks.filter(t => {
+        const hay = (t.title + ' ' + t.artist + ' ' + (t.album || '')).toLowerCase();
+        return words.every(w => hay.includes(w));
+      });
+      box.replaceChildren();
+      if (!hits.length) { box.append(el('div', 'message', 'No songs match “' + q + '”.')); return; }
+      const h = el('h3');
+      h.append(el('span', '', hits.length + ' result' + (hits.length === 1 ? '' : 's')));
+      const all = el('button', 'play-all', '▶ Play');
+      all.onclick = () => playFrom(hits, 0);
+      h.append(all);
+      box.append(h);
+      hits.forEach((t, i) => box.append(trackButton(t, i, hits, true)));
+      markPlaying();
+    }
+
+    function markPlaying() {
+      const url = queue[qi] && queue[qi].url;
+      document.querySelectorAll('.track').forEach(b => {
+        const on = b.dataset.url === url;
+        b.classList.toggle('playing', on);
+        const num = b.querySelector('.num');
+        num.textContent = on ? '♪' : num.dataset.n;
+      });
+    }
+
+    // ---------- playback ----------
+    function playFrom(list, i) {
+      queue = list.slice();
+      if (shuffle) {
+        const first = queue.splice(i, 1)[0];
+        for (let j = queue.length - 1; j > 0; j--) {
+          const k = Math.floor(Math.random() * (j + 1));
+          [queue[j], queue[k]] = [queue[k], queue[j]];
+        }
+        queue.unshift(first);
+        i = 0;
+      }
+      load(i);
+    }
+
+    function load(i) {
+      if (i < 0 || i >= queue.length) return;
+      qi = i;
+      const t = queue[qi];
+      audio.src = t.url;
+      audio.play().catch(() => {});
+      $('nowTitle').textContent = t.title;
+      $('nowArtist').textContent = t.artist + (t.album ? ' · ' + t.album : '');
+      document.title = t.title + ' · Music';
+      ['prevBtn', 'playBtn', 'nextBtn'].forEach(id => $(id).disabled = false);
+      markPlaying();
+      if ('mediaSession' in navigator) {
+        const art = covers[t.albumKey];
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: t.title, artist: t.artist, album: t.album || '',
+          artwork: art ? [{ src: new URL(art, location.href).href }] : []
+        });
+      }
+    }
+
+    const next = () => { if (qi + 1 < queue.length) load(qi + 1); };
+    const prev = () => { if (audio.currentTime > 3) audio.currentTime = 0; else if (qi > 0) load(qi - 1); };
+    const toggle = () => { if (!audio.src) return; audio.paused ? audio.play() : audio.pause(); };
+
+    $('playBtn').onclick = toggle;
+    $('nextBtn').onclick = next;
+    $('prevBtn').onclick = prev;
+    $('shuffleBtn').classList.toggle('on', shuffle);
+    $('shuffleBtn').onclick = () => {
+      shuffle = !shuffle;
+      store.set('music-shuffle', shuffle ? '1' : '0');
+      $('shuffleBtn').classList.toggle('on', shuffle);
+    };
+
+    audio.addEventListener('play', () => { $('playBtn').textContent = '⏸'; $('playBtn').title = 'Pause'; });
+    audio.addEventListener('pause', () => { $('playBtn').textContent = '▶'; $('playBtn').title = 'Play'; });
+    audio.addEventListener('ended', next);
+    audio.addEventListener('loadedmetadata', () => { $('seek').max = audio.duration || 0; $('durTime').textContent = fmt(audio.duration); });
+    audio.addEventListener('timeupdate', () => {
+      if (!seeking) $('seek').value = audio.currentTime;
+      $('curTime').textContent = fmt(audio.currentTime);
+    });
+    audio.addEventListener('error', () => {
+      $('nowArtist').textContent = 'Could not play this file. Skipping…';
+      setTimeout(next, 1500);
+    });
+
+    let seeking = false;
+    $('seek').addEventListener('input', () => { seeking = true; $('curTime').textContent = fmt(+$('seek').value); });
+    $('seek').addEventListener('change', () => { audio.currentTime = +$('seek').value; seeking = false; });
+
+    const savedVol = parseFloat(store.get('music-volume'));
+    audio.volume = $('volume').value = isFinite(savedVol) ? savedVol : 0.8;
+    $('volume').addEventListener('input', () => { audio.volume = +$('volume').value; store.set('music-volume', $('volume').value); });
+
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => audio.play());
+      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+      navigator.mediaSession.setActionHandler('nexttrack', next);
+      navigator.mediaSession.setActionHandler('previoustrack', prev);
+    }
+
+    // Space bar plays/pauses (unless you're typing in the search box)
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+        e.preventDefault(); toggle();
+      }
+    });
+
+    let searchTimer;
+    $('search').addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => showSearch($('search').value.trim()), 150);
+    });
+
+    // ---------- start ----------
+    scan([]).then(() => {
+      tracks.sort((a, b) => byName(a.artist, b.artist) || byName(a.albumKey, b.albumKey) || byName(a.title, b.title));
+      const artists = [...new Set(tracks.map(t => t.artist))].sort(byName);
+      $('count').textContent = artists.length + ' artists · ' + tracks.length + ' songs';
+      const nav = $('artists');
+      artists.forEach(name => {
+        const b = el('button', '', name);
+        b.dataset.name = name;
+        b.onclick = () => showArtist(name);
+        nav.append(b);
+      });
+      if (artists.length) showArtist(artists[0]);
+      else $('tracks').replaceChildren(el('div', 'message', 'No songs found in the music folder yet.'));
+    }).catch(err => {
+      console.error(err);
+      $('count').textContent = '';
+      $('tracks').replaceChildren(el('div', 'message',
+        'Could not load the music library (' + err.message + '). This page only works on the server, where Caddy shares the music folder at ' + BASE));
+    });
+  })();
+  </script>
 </body>
 </html>
