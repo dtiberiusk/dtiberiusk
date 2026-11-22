@@ -145,7 +145,7 @@
       <button id="prevBtn" title="Previous" disabled>⏮</button>
       <button id="playBtn" title="Play" disabled>▶</button>
       <button id="nextBtn" title="Next" disabled>⏭</button>
-      <button id="shuffleBtn" title="Shuffle">⤮</button>
+      <button id="shuffleBtn" title="Shuffle all songs">⤮</button>
     </div>
     <div class="now">
       <div class="title" id="nowTitle">Nothing playing</div>
@@ -218,6 +218,7 @@
         if (parts.length >= 1 && AUDIO.test(it.name)) {
           tracks.push({
             title: titleOf(it.name),
+            file: it.name,             // original file name keeps "01, 02…" track order
             artist: parts[0],
             album: parts.length > 1 ? parts.slice(1).join(' / ') : null,
             albumKey: parts.join('/'),
@@ -302,16 +303,25 @@
     }
 
     // ---------- playback ----------
+    function shuffled(list) {
+      const a = list.slice();
+      for (let j = a.length - 1; j > 0; j--) {
+        const k = Math.floor(Math.random() * (j + 1));
+        [a[j], a[k]] = [a[k], a[j]];
+      }
+      return a;
+    }
+
+    // Shuffle draws from the WHOLE library: the song you picked plays first,
+    // then every other song by every artist in random order.
+    const shuffleAfter = first => [first].concat(shuffled(tracks.filter(t => t.url !== first.url)));
+
     function playFrom(list, i) {
-      queue = list.slice();
       if (shuffle) {
-        const first = queue.splice(i, 1)[0];
-        for (let j = queue.length - 1; j > 0; j--) {
-          const k = Math.floor(Math.random() * (j + 1));
-          [queue[j], queue[k]] = [queue[k], queue[j]];
-        }
-        queue.unshift(first);
+        queue = shuffleAfter(list[i]);
         i = 0;
+      } else {
+        queue = list.slice();
       }
       load(i);
     }
@@ -336,7 +346,24 @@
       }
     }
 
-    const next = () => { if (qi + 1 < queue.length) load(qi + 1); };
+    // At the end of the album or list, keep going through the rest of the library
+    // (in order, or a random song when shuffle is on) so Next always has somewhere to go.
+    function extendQueue() {
+      const cur = queue[qi];
+      if (!cur || tracks.length < 2) return false;
+      if (shuffle) {
+        queue.push(...shuffled(tracks.filter(t => t.url !== cur.url)));
+        return true;
+      }
+      const at = tracks.findIndex(t => t.url === cur.url);
+      const rest = tracks.slice(at + 1);
+      queue.push(...(rest.length ? rest : tracks));   // wrap to the start after the last song
+      return true;
+    }
+    const next = () => {
+      if (qi + 1 >= queue.length && !extendQueue()) return;
+      load(qi + 1);
+    };
     const prev = () => { if (audio.currentTime > 3) audio.currentTime = 0; else if (qi > 0) load(qi - 1); };
     const toggle = () => { if (!audio.src) return; audio.paused ? audio.play() : audio.pause(); };
 
@@ -348,6 +375,17 @@
       shuffle = !shuffle;
       store.set('music-shuffle', shuffle ? '1' : '0');
       $('shuffleBtn').classList.toggle('on', shuffle);
+      const cur = queue[qi];
+      if (shuffle) {
+        // Nothing playing yet: start a random song from the whole library.
+        if (!cur) { if (tracks.length) { queue = shuffled(tracks); load(0); } return; }
+        // Already playing: keep this song, shuffle everything else after it.
+        queue = shuffleAfter(cur); qi = 0;
+      } else if (cur) {
+        // Back to normal order: continue from this song through the library.
+        const at = tracks.findIndex(t => t.url === cur.url);
+        queue = [cur].concat(tracks.slice(at + 1)); qi = 0;
+      }
     };
 
     audio.addEventListener('play', () => { $('playBtn').textContent = '⏸'; $('playBtn').title = 'Pause'; });
@@ -393,7 +431,10 @@
 
     // ---------- start ----------
     scan([]).then(() => {
-      tracks.sort((a, b) => byName(a.artist, b.artist) || byName(a.albumKey, b.albumKey) || byName(a.title, b.title));
+      // Order: artist, then each album (by track number), then that artist's loose songs,
+      // the same order the page shows them in, so Next follows what you see.
+      const groupKey = t => t.album ? '0/' + t.albumKey : '1/';
+      tracks.sort((a, b) => byName(a.artist, b.artist) || byName(groupKey(a), groupKey(b)) || byName(a.file, b.file));
       const artists = [...new Set(tracks.map(t => t.artist))].sort(byName);
       $('count').textContent = artists.length + ' artists · ' + tracks.length + ' songs';
       const nav = $('artists');
