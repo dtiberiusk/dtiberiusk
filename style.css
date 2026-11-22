@@ -205,3 +205,22 @@ footer a:hover {
 .gallery img:hover {
   transform: scale(1.05);
 }
+
+.page-links {
+  display: flex;
+  gap: 1.5rem;
+  margin: 1rem 0;
+}
+
+.page-links a {
+  color: #1a2a5e;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.page-links a:hover {
+  text-decoration: underline;
+  transform: scale(1.1);
+}
