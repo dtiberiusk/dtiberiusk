@@ -55,11 +55,11 @@
       });
     }
 
-    fetch('/art/')
+    fetch('/art/', { headers: { Accept: 'application/json' } })
       .then(r => r.json())
       .then(files => {
         files
-          .filter(f => f.type === 'file' && /\.(jpe?g|png|webp|gif)$/i.test(f.name))
+          .filter(f => (f.type === 'file' || f.is_dir === false) && /\.(jpe?g|png|webp|gif)$/i.test(f.name))
           .filter(f => f.name !== 'haroldscousin.jpeg')
           .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
           .forEach(f => {
