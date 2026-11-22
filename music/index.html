@@ -186,8 +186,9 @@
 
     // ---------- helpers ----------
     const urlFor = parts => BASE + parts.map(encodeURIComponent).join('/');
-    // "01 Intro.mp3" / "01 - Intro.mp3" -> "Intro" (the list already shows track numbers)
-    const titleOf = name => name.replace(/\.[^.]+$/, '').replace(/^(0\d|\d{1,3}\s*[-._])\s*/, '') || name;
+    // "01 Intro.mp3", "01. Intro.mp3", "01 - Intro.mp3", "10) Intro.mp3" -> "Intro"
+    // (the list already shows track numbers)
+    const titleOf = name => name.replace(/\.[^.]+$/, '').replace(/^(?:\d{1,3}\s*[-._)]\s*|0\d\s+)/, '') || name;
     const fmt = s => {
       if (!isFinite(s)) return '0:00';
       s = Math.floor(s);
