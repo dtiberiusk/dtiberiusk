@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Print test</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+  <h1>Print test</h1>
+
+  <input type="file" id="file" accept=".pdf,.jpg,.jpeg,.png,.txt">
+  <button id="printBtn">Print</button>
+  <p id="msg"></p>
+
+  <footer>
+    <a href="../index.html">Home</a>
+  </footer>
+
+  <script>
+    document.getElementById('printBtn').addEventListener('click', async () => {
+      const file = document.getElementById('file').files[0];
+      const msg = document.getElementById('msg');
+      if (!file) { msg.textContent = 'Choose a file first.'; return; }
+
+      const form = new FormData();
+      form.append('file', file);
+
+      msg.textContent = 'Sending…';
+      try {
+        const r = await fetch('/printer/api/print', { method: 'POST', body: form });
+        const d = await r.json();
+        msg.textContent = d.ok ? 'Printing! (' + d.job + ')' : 'Error: ' + d.error;
+      } catch (e) {
+        msg.textContent = 'Could not reach the print service.';
+      }
+    });
+  </script>
+</body>
+</html>
