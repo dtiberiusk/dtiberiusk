@@ -46,20 +46,27 @@
     function layout() {
       const ready = imgs.filter(i => i.naturalWidth);
       if (!ready.length) return;
+      // Let the gallery stretch to measure the free space, then shrink it to the images
+      gallery.style.flex = '';
+      gallery.style.height = '';
       const border = parseFloat(getComputedStyle(ready[0]).borderLeftWidth) * 2;
       const gap = parseFloat(getComputedStyle(gallery).columnGap) || 0;
       const totalRatio = ready.reduce((s, i) => s + i.naturalWidth / i.naturalHeight, 0);
       const availW = gallery.clientWidth - gap * (ready.length - 1) - border * ready.length;
-      const footer = document.querySelector('footer');
-      const top = gallery.getBoundingClientRect().top;
-      const bottom = footer ? footer.getBoundingClientRect().top : window.innerHeight;
-      const availH = bottom - top - gap - border;
-      const h = Math.max(50, Math.min(availW / totalRatio, availH));
+      const availH = gallery.clientHeight - border;
+      const h = Math.max(0, Math.min(availW / totalRatio, availH));
       ready.forEach(i => {
         i.style.height = (h + border) + 'px';
         i.style.width = (h * i.naturalWidth / i.naturalHeight + border) + 'px';
       });
+      gallery.style.flex = 'none';
+      gallery.style.height = (h + border) + 'px';
     }
+
+    // Re-fit when anything above the gallery changes size
+    const top = document.querySelector('.top-image');
+    if (top && !top.complete) top.addEventListener('load', layout);
+    if (document.fonts) document.fonts.ready.then(layout);
 
     fetch('/art/', { headers: { Accept: 'application/json' } })
       .then(r => r.json())

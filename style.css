@@ -86,24 +86,25 @@
 
 /* END FONT SETUP ---------------------------------------------*/ 
 
+/* Text scales with the smaller of width and height, within limits */
 html {
-  font-size: clamp(8px, 0.75rem + 0.6vw, 20px);
+  font-size: clamp(9px, min(0.55rem + 0.6vw, 0.55rem + 0.9vh), 20px);
 }
 
 * {
   box-sizing: border-box;
 }
 
-html, body {
-  overflow: hidden;   /* no scrolling */
-}
-
 html {
   background: #EDE8D0;   /* color of the gap outside the border */
+  overflow: auto;        /* only scrolls once the window is below the minimum size */
 }
 
 /* END PAGE SETUP ---------------------------------------------*/
 
+/* The framed box: a column that exactly fills the window.
+   header / links / gallery / links / footer stack in order;
+   the gallery takes whatever height is left over. */
 body {
   background: #EDE8D0;
   font-family: "Montserrat", sans-serif;
@@ -112,19 +113,24 @@ body {
   text-align: left;
   font-size: 1rem;
 
-  margin: 1.25rem;
-  height: calc(100dvh - 2.5rem);                 
-  border: 0.5rem solid #1a2a5e;     
-  padding: 2rem;
-  position: relative;
-  
+  margin: clamp(0.5rem, 2vmin, 1.25rem);
+  height: calc(100dvh - 2 * clamp(0.5rem, 2vmin, 1.25rem));
+  min-height: 24rem;     /* below this, the page scrolls instead of overlapping */
+  min-width: 17rem;
+  border: 0.5rem solid #1a2a5e;
+  padding: clamp(0.75rem, 3vmin, 2rem);
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 header {
   display: flex;
-  justify-content: flex-start; 
-  align-items: flex-start;         
-  gap: 2rem;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: clamp(0.75rem, 3vw, 2rem);
+  flex: none;
 }
 
 .titles h1 {
@@ -132,7 +138,7 @@ header {
 }
 
 .top-image {
-  width: 10rem;
+  width: clamp(4.5rem, min(22vw, 22vh), 10rem);
   height: auto;
   border: 0.4rem solid #1a2a5e;
   display: block;
@@ -150,7 +156,7 @@ h1 {
   font-style: normal;
   color: #1a2a5e;
   font-size: 1.5rem;
-  
+  margin-bottom: 0.5em;
 }
 
 h2 {
@@ -158,18 +164,71 @@ h2 {
   font-weight: 400;
   font-style: normal;
   color: #1a2a5e;
-  font-size: 0.95rem; 
+  font-size: 0.95rem;
+  margin: 0;
 }
 
-footer {
-  position: absolute;
-  bottom: 2rem;
-  left: 2rem;
-  right: 2rem;
+/* Gallery: the script measures the free height, sizes the images to fit,
+   then shrinks the gallery to the images so the gap above and below is
+   always the same. Any spare room ends up above the footer. */
+.gallery {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   gap: 1.5rem;
+  margin: 0.75rem 0;
   justify-content: center;
   align-items: center;
+}
+
+.gallery img {
+  flex: none;
+  display: block;
+  height: 0;            /* hidden until the script sizes it */
+  width: auto;
+  border: 0.4rem solid #1a2a5e;
+  transition: transform 0.2s ease;
+}
+
+.gallery img:hover {
+  transform: scale(1.05);
+}
+
+.page-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.5rem;
+  margin: 0.75rem 0;
+  flex: none;
+}
+
+.page-links a {
+  color: #1a2a5e;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.page-links a:hover {
+  text-decoration: underline;
+  transform: scale(1.1);
+}
+
+/* Footer sits in normal flow at the bottom, so nothing can slide under it */
+footer {
+  flex: none;
+  margin-top: auto;
+  padding-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  justify-content: center;
+  align-items: center;
+}
+
+footer p {
+  margin: 0;
 }
 
 footer a {
@@ -182,45 +241,6 @@ footer a {
 }
 
 footer a:hover {
-  text-decoration: underline;
-  transform: scale(1.1);
-}
-
-.gallery {
-  display: flex;
-  gap: 1.5rem;
-  margin-top: 2rem;
-  justify-content: center;
-}
-
-.gallery img {
-  flex: none;
-  display: block;
-  height: 12rem;
-  width: auto;
-  border: 0.4rem solid #1a2a5e;
-  transition: transform 0.2s ease;
-}
-
-.gallery img:hover {
-  transform: scale(1.05);
-}
-
-.page-links {
-  display: flex;
-  gap: 1.5rem;
-  margin: 1rem 0;
-}
-
-.page-links a {
-  color: #1a2a5e;
-  font-weight: 600;
-  text-decoration: none;
-  display: inline-block;
-  transition: transform 0.2s ease;
-}
-
-.page-links a:hover {
   text-decoration: underline;
   transform: scale(1.1);
 }
