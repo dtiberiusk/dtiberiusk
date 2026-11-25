@@ -3,39 +3,568 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Print test</title>
+  <title>Printer</title>
   <link rel="stylesheet" href="../style.css">
+  <script src="../tools/lib/pdf-lib.min.js"></script>
+  <style>
+    /* The page keeps the site's framed, no-scroll layout; the two panels scroll inside it. */
+    .print-app {
+      flex: 1 1 0;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(16rem, 26rem) 1fr;
+      gap: 1.5rem;
+      margin: 0.75rem 0;
+    }
+    .controls { overflow: auto; padding-right: 0.5rem; }
+    .preview { min-height: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .tabs button { flex: 1; }
+    .tabs button.on { background: #1a2a5e; color: #EDE8D0; }
+
+    button, select, input, textarea {
+      font: inherit;
+      color: #1a2a5e;
+      background: #f7f4e6;
+      border: 0.15rem solid #1a2a5e;
+      padding: 0.35em 0.6em;
+    }
+    button { cursor: pointer; font-weight: 600; }
+    button:hover { background: #fff; }
+    button:disabled { opacity: 0.45; cursor: default; }
+    button.primary { background: #1a2a5e; color: #EDE8D0; width: 100%; padding: 0.6em; font-size: 1.1rem; }
+    button.primary:hover { background: #26397a; }
+
+    fieldset { border: 0.15rem solid #1a2a5e; margin: 0 0 0.75rem; padding: 0.6rem 0.75rem; }
+    legend { font-weight: 700; padding: 0 0.3rem; }
+    label.row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin: 0.35rem 0; }
+    label.row select, label.row input[type=text], label.row input[type=number] { width: 11rem; }
+
+    #drop {
+      border: 0.15rem dashed #1a2a5e;
+      padding: 1.25rem;
+      text-align: center;
+      cursor: pointer;
+      margin-bottom: 0.5rem;
+    }
+    #drop.hot { background: #fff; }
+    #fileList { list-style: none; margin: 0 0 0.75rem; padding: 0; }
+    #fileList li { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; }
+    #fileList li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #fileList li button { padding: 0 0.45em; }
+
+    #textInput { width: 100%; height: 12rem; resize: vertical; font-family: "Courier New", monospace; }
+    .small { font-size: 0.85rem; opacity: 0.8; }
+    .links { display: flex; gap: 1rem; flex-wrap: wrap; margin: 0.4rem 0 0.75rem; }
+    .links a { color: #1a2a5e; font-weight: 600; cursor: pointer; }
+
+    #stage {
+      flex: 1 1 0;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      background: #e2dcc0;
+      border: 0.15rem solid #1a2a5e;
+      overflow: hidden;
+    }
+    #stage canvas { background: #fff; box-shadow: 0 0.2rem 0.8rem rgba(26, 42, 94, 0.35); }
+    #stage .empty { opacity: 0.7; text-align: center; padding: 1rem; }
+    .nav { display: flex; align-items: center; justify-content: center; gap: 1rem; }
+    #msg { min-height: 1.4em; font-weight: 600; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 50rem) {
+      .print-app { grid-template-columns: 1fr; overflow: auto; }
+      .controls { overflow: visible; }
+      #stage { min-height: 22rem; }
+    }
+  </style>
 </head>
 
 <body>
-  <h1>Print test</h1>
+  <header>
+    <div class="titles">
+      <h1>Printer</h1>
+      <h2>PDFs, pictures and text, scaled and centered on the paper</h2>
+    </div>
+  </header>
 
-  <input type="file" id="file" accept=".pdf,.jpg,.jpeg,.png,.txt">
-  <button id="printBtn">Print</button>
-  <p id="msg"></p>
+  <main class="print-app">
+    <section class="controls">
+      <div class="tabs">
+        <button id="tabFiles" class="on">Files</button>
+        <button id="tabText">Type text</button>
+      </div>
+
+      <!-- Files -->
+      <div id="paneFiles">
+        <div id="drop">Drop files here or click to choose<br><span class="small">PDF, JPG, PNG, GIF, WEBP, TXT</span></div>
+        <input type="file" id="file" multiple hidden
+               accept=".pdf,.txt,.text,.log,.md,.csv,.jpg,.jpeg,.png,.gif,.webp,.bmp,application/pdf,text/plain,image/*">
+        <ul id="fileList"></ul>
+      </div>
+
+      <!-- Typed text -->
+      <div id="paneText" hidden>
+        <textarea id="textInput" placeholder="Type or paste text to print…"></textarea>
+        <label class="row">File name <input type="text" id="textName" value="note"></label>
+        <div class="links"><a id="saveTxt">Save as .txt</a></div>
+      </div>
+
+      <fieldset>
+        <legend>Paper</legend>
+        <label class="row">Size
+          <select id="size">
+            <option value="letter" selected>Letter, 8.5 × 11 in</option>
+            <option value="6x8">6 × 8 in</option>
+            <option value="5x7">5 × 7 in</option>
+            <option value="4x6">4 × 6 in</option>
+            <option value="8x10">8 × 10 in</option>
+            <option value="legal">Legal, 8.5 × 14 in</option>
+            <option value="a4">A4, 210 × 297 mm</option>
+          </select>
+        </label>
+        <label class="row">Rotate to fit
+          <select id="rotate">
+            <option value="auto" selected>Automatic</option>
+            <option value="off">Never (upright)</option>
+            <option value="on">Always (sideways)</option>
+          </select>
+        </label>
+        <label class="row">Margin
+          <select id="margin">
+            <option value="0">None</option>
+            <option value="0.25" selected>¼ inch</option>
+            <option value="0.5">½ inch</option>
+            <option value="1">1 inch</option>
+          </select>
+        </label>
+        <label class="row">Text size
+          <select id="fontSize">
+            <option value="9">9 pt</option>
+            <option value="10">10 pt</option>
+            <option value="11" selected>11 pt</option>
+            <option value="12">12 pt</option>
+            <option value="14">14 pt</option>
+            <option value="18">18 pt</option>
+            <option value="24">24 pt</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Print</legend>
+        <label class="row">Copies <input type="number" id="copies" min="1" max="20" value="1"></label>
+        <label class="row">Pages <input type="text" id="pages" placeholder="all, or e.g. 1-3,5"></label>
+        <label class="row" id="duplexRow">Two-sided <input type="checkbox" id="duplex"></label>
+      </fieldset>
+
+      <button id="printBtn" class="primary" disabled>Print</button>
+      <p id="msg"></p>
+    </section>
+
+    <section class="preview">
+      <div id="stage"><div class="empty">Choose a file or type some text to see a preview.</div></div>
+      <div class="nav">
+        <button id="prev" disabled>‹</button>
+        <span id="pageInfo">–</span>
+        <button id="next" disabled>›</button>
+        <a id="savePdf" class="small" style="color:#1a2a5e;font-weight:600;cursor:pointer" hidden>Download PDF</a>
+      </div>
+    </section>
+  </main>
 
   <footer>
     <a href="../index.html">Home</a>
   </footer>
 
-  <script>
-    document.getElementById('printBtn').addEventListener('click', async () => {
-      const file = document.getElementById('file').files[0];
-      const msg = document.getElementById('msg');
-      if (!file) { msg.textContent = 'Choose a file first.'; return; }
+  <script type="module">
+    import * as pdfjsLib from "../tools/lib/pdfjs/pdf.min.mjs";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("../tools/lib/pdfjs/pdf.worker.min.mjs", import.meta.url).href;
+    const PDFJS_OPTS = {
+      standardFontDataUrl: new URL("../tools/lib/pdfjs/standard_fonts/", import.meta.url).href,
+      wasmUrl: new URL("../tools/lib/pdfjs/wasm/", import.meta.url).href,
+      iccUrl: new URL("../tools/lib/pdfjs/iccs/", import.meta.url).href,
+    };
+    const { PDFDocument, StandardFonts, degrees } = PDFLib;
+    const PT = 72;   // PDF points per inch
 
-      const form = new FormData();
-      form.append('file', file);
+    // Paper sizes, always portrait (width <= height). "media" is what app.py expects.
+    // Two-sided printing on the HL-L2460DW only works on Letter, Legal and A4.
+    const SIZES = {
+      letter: { w: 8.5,  h: 11,    media: "letter", duplex: true },
+      "6x8":  { w: 6,    h: 8,     media: "6x8" },
+      "5x7":  { w: 5,    h: 7,     media: "5x7" },
+      "4x6":  { w: 4,    h: 6,     media: "4x6" },
+      "8x10": { w: 8,    h: 10,    media: "8x10" },
+      legal:  { w: 8.5,  h: 14,    media: "legal",  duplex: true },
+      a4:     { w: 8.27, h: 11.69, media: "a4",     duplex: true },
+    };
 
-      msg.textContent = 'Sending…';
-      try {
-        const r = await fetch('/printer/api/print', { method: 'POST', body: form });
-        const d = await r.json();
-        msg.textContent = d.ok ? 'Printing! (' + d.job + ')' : 'Error: ' + d.error;
-      } catch (e) {
-        msg.textContent = 'Could not reach the print service.';
+    const $ = id => document.getElementById(id);
+    const msg = t => { $("msg").textContent = t; };
+
+    let mode = "files";          // "files" or "text"
+    let files = [];              // File objects, printed in this order
+    let built = null;            // { bytes, pages } of the prepared PDF
+    let previewDoc = null, previewTask = null, previewPage = 1, buildToken = 0;
+
+    // ---------- what kind of file is it ----------
+    function kindOf(f) {
+      const ext = (f.name.split(".").pop() || "").toLowerCase();
+      if (ext === "pdf" || f.type === "application/pdf") return "pdf";
+      if (f.type.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext)) return "image";
+      if (f.type.startsWith("text/") || ["txt", "text", "log", "md", "csv"].includes(ext)) return "text";
+      return null;
+    }
+
+    // ---------- placing something scaled + centered on the paper ----------
+    // w,h: the item's own size. srcRot: clockwise rotation the item already carries (PDF /Rotate).
+    // Returns the draw options (x, y, width, height, rotate) for pdf-lib.
+    function fit(w, h, srcRot, pw, ph, m) {
+      const W = pw - 2 * m, H = ph - 2 * m;
+      const upright = (srcRot % 180) ? [h, w] : [w, h];          // how it looks before we rotate it
+      const scaleFor = turned => turned ? Math.min(W / upright[1], H / upright[0])
+                                        : Math.min(W / upright[0], H / upright[1]);
+      const choice = $("rotate").value;
+      const turn = choice === "on" || (choice === "auto" && scaleFor(true) > scaleFor(false) * 1.0001);
+      const s = scaleFor(turn);
+      const r = ((360 - srcRot) + (turn ? 90 : 0)) % 360;         // total counter-clockwise rotation
+      const sw = w * s, sh = h * s;                                 // scaled size before rotating
+      const [dw, dh] = (r % 180) ? [sh, sw] : [sw, sh];             // size as it lands on the paper
+      const cx = pw / 2, cy = ph / 2;
+      // pdf-lib rotates around the item's bottom-left corner, so shift that corner to keep it centered.
+      const origin = {
+        0:   [cx - dw / 2, cy - dh / 2],
+        90:  [cx + dw / 2, cy - dh / 2],
+        180: [cx + dw / 2, cy + dh / 2],
+        270: [cx - dw / 2, cy + dh / 2],
+      }[r];
+      return { x: origin[0], y: origin[1], width: sw, height: sh, rotate: degrees(r) };
+    }
+
+    // ---------- images ----------
+    // JPEG EXIF orientation (phone photos). 1 = already upright.
+    function jpegOrientation(b) {
+      if (b[0] !== 0xFF || b[1] !== 0xD8) return 1;
+      let i = 2;
+      while (i + 4 < b.length) {
+        if (b[i] !== 0xFF) return 1;
+        const marker = b[i + 1], len = (b[i + 2] << 8) | b[i + 3];
+        if (marker === 0xE1 && b[i + 4] === 0x45 && b[i + 5] === 0x78) {          // "Exif"
+          const t = i + 10, le = b[t] === 0x49;
+          const u16 = o => le ? b[o] | (b[o + 1] << 8) : (b[o] << 8) | b[o + 1];
+          const u32 = o => le ? (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0
+                              : ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+          const ifd = t + u32(t + 4), n = u16(ifd);
+          for (let k = 0; k < n; k++) {
+            const e = ifd + 2 + k * 12;
+            if (u16(e) === 0x0112) return u16(e + 8) || 1;
+          }
+          return 1;
+        }
+        if (marker === 0xDA) return 1;
+        i += 2 + len;
       }
+      return 1;
+    }
+
+    // Redraw an image through a canvas (applies EXIF rotation, converts GIF/WEBP/BMP).
+    async function viaCanvas(file, asJpeg) {
+      const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+      const c = document.createElement("canvas");
+      c.width = bmp.width; c.height = bmp.height;
+      const g = c.getContext("2d");
+      if (asJpeg) { g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); }
+      g.drawImage(bmp, 0, 0);
+      const blob = await new Promise(res => c.toBlob(res, asJpeg ? "image/jpeg" : "image/png", 0.95));
+      return new Uint8Array(await blob.arrayBuffer());
+    }
+
+    async function addImage(out, f, pw, ph, m) {
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      const isJpg = bytes[0] === 0xFF && bytes[1] === 0xD8;
+      const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
+      let img;
+      if (isJpg && jpegOrientation(bytes) === 1) img = await out.embedJpg(bytes);
+      else if (isJpg) img = await out.embedJpg(await viaCanvas(f, true));
+      else if (isPng) img = await out.embedPng(bytes);
+      else img = await out.embedPng(await viaCanvas(f, false));
+      const page = out.addPage([pw, ph]);
+      page.drawImage(img, fit(img.width, img.height, 0, pw, ph, m));
+    }
+
+    // ---------- PDFs ----------
+    async function addPdf(out, f, pw, ph, m) {
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      let src = null;
+      try {
+        src = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+        if (src.isEncrypted) src = null;
+      } catch (e) { src = null; }
+
+      if (src) {
+        const pages = src.getPages();
+        const embedded = await out.embedPdf(src, pages.map((_, i) => i));
+        embedded.forEach((ep, i) => {
+          const rot = ((pages[i].getRotation().angle % 360) + 360) % 360;
+          const page = out.addPage([pw, ph]);
+          page.drawPage(ep, fit(ep.width, ep.height, rot, pw, ph, m));
+        });
+        return;
+      }
+
+      // Locked or unusual PDFs: draw each page as a 200 dpi picture instead.
+      const task = pdfjsLib.getDocument({ data: bytes, ...PDFJS_OPTS });
+      const doc = await task.promise;
+      for (let n = 1; n <= doc.numPages; n++) {
+        const p = await doc.getPage(n);
+        const vp = p.getViewport({ scale: 200 / 72 });
+        const c = document.createElement("canvas");
+        c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+        const g = c.getContext("2d");
+        g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+        await p.render({ canvasContext: g, viewport: vp }).promise;
+        const blob = await new Promise(res => c.toBlob(res, "image/jpeg", 0.92));
+        const img = await out.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+        const page = out.addPage([pw, ph]);
+        page.drawImage(img, fit(img.width, img.height, 0, pw, ph, m));
+      }
+      task.destroy();
+    }
+
+    // ---------- text ----------
+    // Lays text out in Courier (like a plain .txt), wrapped to the paper. "Always (sideways)"
+    // lays it out across the long edge.
+    async function addText(out, font, text, pw, ph, m) {
+      const fs = +$("fontSize").value;
+      const sideways = $("rotate").value === "on";
+      const m2 = Math.max(m, 0.25 * PT);                      // text always gets at least ¼ inch
+      const [lw, lh] = sideways ? [ph, pw] : [pw, ph];       // layout width/height
+      const charW = font.widthOfTextAtSize("M", fs);
+      const perLine = Math.max(1, Math.floor((lw - 2 * m2) / charW));
+      const lineH = fs * 1.2;
+      const perPage = Math.max(1, Math.floor((lh - 2 * m2) / lineH));
+
+      // Swap characters Courier can't print for "?"
+      const ok = new Map();
+      const clean = s => [...s].map(ch => {
+        if (!ok.has(ch)) { try { font.encodeText(ch); ok.set(ch, true); } catch { ok.set(ch, false); } }
+        return ok.get(ch) ? ch : "?";
+      }).join("");
+
+      // Wrap each line at spaces where possible. Form feed (\f) forces a new page.
+      const lines = [];
+      text = text.replace(/\r\n?/g, "\n").replace(/\t/g, "    ");
+      for (const raw of text.split("\n")) {
+        const parts = raw.split("\f");
+        parts.forEach((part, pi) => {
+          if (pi > 0) lines.push("\f");
+          let s = clean(part);
+          if (!s.length) { lines.push(""); return; }
+          while (s.length > perLine) {
+            let cut = s.lastIndexOf(" ", perLine);
+            if (cut <= 0) cut = perLine;
+            lines.push(s.slice(0, cut).trimEnd());
+            s = s.slice(cut).replace(/^ /, "");
+          }
+          lines.push(s);
+        });
+      }
+      while (lines.length && lines[lines.length - 1] === "") lines.pop();
+      if (!lines.length) lines.push("");
+
+      let page = null, row = perPage;
+      for (const line of lines) {
+        if (line === "\f" || row >= perPage) {
+          page = out.addPage([pw, ph]); row = 0;
+          if (line === "\f") continue;
+        }
+        const u = m2, v = lh - m2 - fs - row * lineH;       // position in the layout
+        if (line) {
+          if (sideways) page.drawText(line, { x: pw - v, y: u, size: fs, font, rotate: degrees(90) });
+          else          page.drawText(line, { x: u, y: v, size: fs, font });
+        }
+        row++;
+      }
+    }
+
+    // ---------- the typed text as a .txt file ----------
+    function typedFile() {
+      const name = ($("textName").value.trim() || "note").replace(/[\\/:*?"<>|]/g, "_").replace(/\.txt$/i, "");
+      return new File([$("textInput").value], name + ".txt", { type: "text/plain" });
+    }
+
+    // ---------- build the print-ready PDF ----------
+    async function build() {
+      const size = SIZES[$("size").value];
+      const pw = size.w * PT, ph = size.h * PT, m = +$("margin").value * PT;
+      const sources = mode === "text" ? ($("textInput").value.trim() ? [typedFile()] : []) : files;
+      if (!sources.length) return null;
+
+      const out = await PDFDocument.create();
+      out.setTitle(sources.length === 1 ? sources[0].name : "Print job");
+      let font = null;
+      for (const f of sources) {
+        const kind = kindOf(f);
+        try {
+          if (kind === "pdf") await addPdf(out, f, pw, ph, m);
+          else if (kind === "image") await addImage(out, f, pw, ph, m);
+          else if (kind === "text") {
+            font ??= await out.embedFont(StandardFonts.Courier);
+            await addText(out, font, await f.text(), pw, ph, m);
+          }
+          else throw new Error("unsupported");
+        } catch (e) {
+          console.error(e);
+          throw new Error(`Couldn't read ${f.name}.`);
+        }
+      }
+      return { bytes: await out.save(), pages: out.getPageCount(), name: sources.length === 1 ? sources[0].name : "print" };
+    }
+
+    // ---------- preview ----------
+    async function rebuild() {
+      const token = ++buildToken;
+      $("printBtn").disabled = true;
+      let result = null, err = null;
+      try { result = await build(); } catch (e) { err = e.message; }
+      if (token !== buildToken) return;          // a newer change arrived while building
+
+      built = result;
+      if (previewTask) { previewTask.destroy(); previewTask = previewDoc = null; }
+      $("savePdf").hidden = !built;
+      if (!built) {
+        $("stage").innerHTML = `<div class="empty">${err || "Choose a file or type some text to see a preview."}</div>`;
+        $("pageInfo").textContent = "–";
+        $("prev").disabled = $("next").disabled = true;
+        if (err) msg(err);
+        return;
+      }
+      msg("");
+      previewTask = pdfjsLib.getDocument({ data: built.bytes.slice(), ...PDFJS_OPTS });
+      previewDoc = await previewTask.promise;
+      if (token !== buildToken) return;
+      previewPage = Math.min(previewPage, built.pages);
+      $("printBtn").disabled = false;
+      $("printBtn").textContent = built.pages === 1 ? "Print 1 page" : `Print ${built.pages} pages`;
+      showPage();
+    }
+
+    async function showPage() {
+      if (!previewDoc) return;
+      const p = await previewDoc.getPage(previewPage);
+      const stage = $("stage");
+      const base = p.getViewport({ scale: 1 });
+      const fitScale = Math.min((stage.clientWidth - 32) / base.width, (stage.clientHeight - 32) / base.height);
+      const dpr = window.devicePixelRatio || 1;
+      const vp = p.getViewport({ scale: fitScale * dpr });
+      const c = document.createElement("canvas");
+      c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+      c.style.width = (vp.width / dpr) + "px"; c.style.height = (vp.height / dpr) + "px";
+      await p.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+      stage.replaceChildren(c);
+      $("pageInfo").textContent = `Page ${previewPage} of ${built.pages}`;
+      $("prev").disabled = previewPage <= 1;
+      $("next").disabled = previewPage >= built.pages;
+    }
+
+    let timer;
+    const later = () => { clearTimeout(timer); timer = setTimeout(rebuild, 300); };
+
+    // ---------- file list ----------
+    function addFiles(list) {
+      const fresh = [...list].filter(f => kindOf(f));
+      if (fresh.length < list.length) msg("Some files were skipped: only PDF, picture and text files can be printed.");
+      files.push(...fresh);
+      showFiles(); rebuild();
+    }
+    function showFiles() {
+      const ul = $("fileList");
+      ul.replaceChildren(...files.map((f, i) => {
+        const li = document.createElement("li");
+        const name = document.createElement("span");
+        name.textContent = f.name;
+        const x = document.createElement("button");
+        x.textContent = "×"; x.title = "Remove";
+        x.onclick = () => { files.splice(i, 1); showFiles(); rebuild(); };
+        li.append(name, x);
+        return li;
+      }));
+    }
+
+    // ---------- wiring ----------
+    function setMode(m) {
+      mode = m;
+      $("tabFiles").classList.toggle("on", m === "files");
+      $("tabText").classList.toggle("on", m === "text");
+      $("paneFiles").hidden = m !== "files";
+      $("paneText").hidden = m !== "text";
+      previewPage = 1; rebuild();
+    }
+    $("tabFiles").onclick = () => setMode("files");
+    $("tabText").onclick = () => setMode("text");
+
+    const drop = $("drop");
+    drop.onclick = () => $("file").click();
+    $("file").onchange = e => { addFiles(e.target.files); e.target.value = ""; };
+    document.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("hot"); });
+    document.addEventListener("dragleave", e => { if (!e.relatedTarget) drop.classList.remove("hot"); });
+    document.addEventListener("drop", e => {
+      e.preventDefault(); drop.classList.remove("hot");
+      if (e.dataTransfer.files.length) { setMode("files"); addFiles(e.dataTransfer.files); }
     });
+
+    function updateDuplex() {
+      const can = !!SIZES[$("size").value].duplex;
+      $("duplex").disabled = !can;
+      if (!can) $("duplex").checked = false;
+      $("duplexRow").title = can ? "" : "Two-sided printing only works on Letter, Legal and A4.";
+    }
+    $("size").onchange = () => { updateDuplex(); rebuild(); };
+    ["rotate", "margin", "fontSize"].forEach(id => $(id).onchange = rebuild);
+    $("textInput").oninput = later;
+    $("textName").oninput = later;
+
+    $("prev").onclick = () => { previewPage--; showPage(); };
+    $("next").onclick = () => { previewPage++; showPage(); };
+    new ResizeObserver(() => { clearTimeout(showPage._t); showPage._t = setTimeout(showPage, 150); }).observe($("stage"));
+
+    function download(blob, name) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = name; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    $("saveTxt").onclick = () => { const f = typedFile(); download(f, f.name); };
+    $("savePdf").onclick = () => built && download(new Blob([built.bytes], { type: "application/pdf" }),
+                                                   built.name.replace(/\.[^.]+$/, "") + ".pdf");
+
+    // ---------- send to the printer ----------
+    $("printBtn").onclick = async () => {
+      if (!built) return;
+      const form = new FormData();
+      const base = built.name.replace(/\.[^.]+$/, "") || "print";
+      form.append("file", new Blob([built.bytes], { type: "application/pdf" }), base + ".pdf");
+      form.append("copies", $("copies").value || "1");
+      form.append("media", SIZES[$("size").value].media);
+      if ($("duplex").checked) form.append("duplex", "1");
+      const pages = $("pages").value.replace(/\s/g, "");
+      if (pages) form.append("pages", pages);
+
+      msg("Sending…");
+      $("printBtn").disabled = true;
+      try {
+        const r = await fetch("/printer/api/print", { method: "POST", body: form });
+        const d = await r.json();
+        msg(d.ok ? "Printing! (" + d.job + ")" : "Error: " + d.error);
+      } catch (e) {
+        msg("Could not reach the print service.");
+      }
+      $("printBtn").disabled = false;
+    };
+
+    updateDuplex();
   </script>
 </body>
 </html>
